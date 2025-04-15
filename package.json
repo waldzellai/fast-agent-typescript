@@ -1,0 +1,52 @@
+{
+  "name": "fast-agent-typescript",
+  "version": "1.0.0",
+  "description": "<p align=\"center\"> <a href=\"https://pypi.org/project/fast-agent-mcp/\"><img src=\"https://img.shields.io/pypi/v/fast-agent-mcp?color=%2334D058&label=pypi\" /></a> <a href=\"#\"><img src=\"https://github.com/evalstate/fast-agent/actions/workflows/main-checks.yml/badge.svg\" /></a> <a href=\"https://github.com/evalstate/fast-agent/issues\"><img src=\"https://img.shields.io/github/issues-raw/evalstate/fast-agent\" /></a> <a href=\"https://discord.gg/xg5cJ7ndN6\"><img src=\"https://img.shields.io/discord/1358470293990936787\" alt=\"discord\" /></a> <img alt=\"Pepy Total Downloads\" src=\"https://img.shields.io/pepy/dt/fast-agent-mcp?label=pypi%20%7C%20downloads\"/> <a href=\"https://github.com/evalstate/fast-agent-mcp/blob/main/LICENSE\"><img src=\"https://img.shields.io/pypi/l/fast-agent-mcp\" /></a> </p>",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/consola": "^1.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.14.1",
+    "@typescript-eslint/eslint-plugin": "^8.29.1",
+    "@typescript-eslint/parser": "^8.29.1",
+    "chalk": "^5.4.1",
+    "consola": "^3.4.2",
+    "eslint": "^9.24.0",
+    "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-prettier": "^5.2.6",
+    "jest": "^29.7.0",
+    "prettier": "^3.5.3",
+    "ts-jest": "^29.3.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.200.0",
+    "@opentelemetry/sdk-node": "^0.200.0",
+    "@types/inquirer": "^9.0.7",
+    "@types/js-yaml": "^4.0.9",
+    "axios": "^1.8.4",
+    "commander": "^13.1.0",
+    "fastify": "^5.3.0",
+    "inquirer": "^12.5.2",
+    "js-yaml": "^4.1.0",
+    "openai": "^4.93.0",
+    "treeify": "^1.1.0",
+    "zod": "^3.24.2",
+    "agent-orchestrator-ts": "file:./agent-orchestrator-ts"
+  }
+}
