@@ -1,15 +1,15 @@
-import { AgentType, AgentConfig } from "./src/core/agentTypes";
+import { AgentType, AgentConfig } from './src/core/agentTypes';
 import {
   AgentConfigError,
   CircularDependencyError,
   ServerConfigError,
   PromptExitError,
-} from "./src/core/exceptions";
+} from './src/core/exceptions';
 import {
   validateServerReferences,
   validateWorkflowReferences,
   getDependenciesGroups,
-} from "./src/core/validation";
+} from './src/core/validation';
 import {
   agent,
   orchestrator,
@@ -17,21 +17,42 @@ import {
   chain,
   parallel,
   evaluatorOptimizer,
-} from "./src/core/directDecorators";
+} from './src/core/directDecorators';
 import {
   getModelFactory,
   createAgentsByType,
   createAgentsInDependencyOrder,
-} from "./src/core/directFactory";
+} from './src/core/directFactory';
 import {
   getEnhancedInput,
   handleSpecialCommands,
   getSelectionInput,
   getArgumentInput,
-} from "./src/core/enhancedPrompt";
-import { BaseRequestParams } from "./src/core/requestParams";
+} from './src/core/enhancedPrompt';
+import { BaseRequestParams } from './src/core/requestParams';
+import { Agent, BaseAgent } from './src/mcpAgent';
+import { FastAgent } from './src/fastAgent';
+import {
+  Workflow,
+  BaseWorkflow,
+  Chain,
+  ChainConfig,
+  Router,
+  RouterConfig,
+  Parallel,
+  ParallelConfig,
+  Orchestrator,
+  OrchestratorConfig,
+  EvaluatorOptimizer,
+  EvaluatorOptimizerConfig,
+} from './src/workflows';
 
 export {
+  // Main Classes
+  FastAgent,
+  Agent,
+  BaseAgent,
+
   // Types and Interfaces
   AgentType,
   AgentConfig,
@@ -66,4 +87,18 @@ export {
   handleSpecialCommands,
   getSelectionInput,
   getArgumentInput,
+
+  // Workflow Types
+  Workflow,
+  BaseWorkflow,
+  Chain,
+  ChainConfig,
+  Router,
+  RouterConfig,
+  Parallel,
+  ParallelConfig,
+  Orchestrator,
+  OrchestratorConfig,
+  EvaluatorOptimizer,
+  EvaluatorOptimizerConfig,
 };

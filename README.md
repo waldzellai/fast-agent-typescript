@@ -14,6 +14,10 @@
 
 **`fast-agent`** enables you to create and interact with sophisticated Agents and Workflows in minutes. It is the first framework with complete, end-to-end tested MCP Feature support including Sampling. Both Anthropic (Haiku, Sonnet, Opus) and OpenAI models (gpt-4o family, o1/o3 family) are supported.
 
+## TypeScript Port
+
+This repository contains a TypeScript port of the Fast-Agent Python library. It provides the same core functionality with a TypeScript-friendly API. The TypeScript port is currently in development and may not have all the features of the Python version yet.
+
 The simple declarative syntax lets you concentrate on composing your Prompts and MCP Servers to [build effective agents](https://www.anthropic.com/research/building-effective-agents).
 
 `fast-agent` is multi-modal, supporting Images and PDFs for both Anthropic and OpenAI endpoints via Prompts, Resources and MCP Tool Call results. The inclusion of passthrough and playback LLMs enable rapid development and test of Python glue-code for your applications.
@@ -32,6 +36,8 @@ Simple model selection makes testing Model <-> MCP Server interaction painless. 
 
 ## Get started:
 
+### Python Version
+
 Start by installing the [uv package manager](https://docs.astral.sh/uv/) for Python. Then:
 
 ```bash
@@ -41,6 +47,50 @@ fast-agent setup                    # create an example agent and config files
 uv run agent.py                     # run your first agent
 uv run agent.py --model=o3-mini.low # specify a model
 fast-agent quickstart workflow       # create "building effective agents" examples
+```
+
+### TypeScript Version
+
+Install the TypeScript version using npm:
+
+```bash
+npm install fast-agent-typescript   # install fast-agent TypeScript!
+
+npx fastagent setup                 # create an example agent and config files
+npx ts-node agent.ts               # run your first agent
+npx ts-node agent.ts --model=o3-mini.low # specify a model
+```
+
+#### TypeScript Example
+
+```typescript
+import { FastAgent } from 'fast-agent-typescript';
+
+// Create a new FastAgent instance
+const app = new FastAgent('simple-agent-example');
+
+// Define an agent with a custom instruction
+app.agent(
+  {
+    name: 'simple',
+    instruction: 'You are a helpful assistant that provides concise answers.',
+  },
+  async (agent) => {
+    console.log('Starting simple agent...');
+
+    // Send a message to the agent
+    const response = await agent.send(
+      'Hello! What can you help me with today?'
+    );
+    console.log('Agent response:', response);
+
+    // Start an interactive prompt session
+    await agent.prompt('Ask me anything!');
+  }
+);
+
+// Run the agent
+app.run();
 ```
 
 Other quickstart examples include a Researcher Agent (with Evaluator-Optimizer workflow) and Data Analysis Agent (similar to the ChatGPT experience), demonstrating MCP Roots support.
@@ -385,10 +435,10 @@ Sampling LLMs are configured per Client/Server pair. Specify the model name in f
 mcp:
   servers:
     sampling_resource:
-      command: "uv"
-      args: ["run", "sampling_resource_server.py"]
+      command: 'uv'
+      args: ['run', 'sampling_resource_server.py']
       sampling:
-        model: "haiku"
+        model: 'haiku'
 ```
 
 ### Secrets File
