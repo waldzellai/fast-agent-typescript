@@ -197,3 +197,4 @@ tests/integration/prompt-state/history.json
 
 .roomodes
 node_modules
+agent-orchestrator-ts
