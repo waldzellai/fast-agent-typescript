@@ -1,15 +1,16 @@
-import os
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Tuple, Type
 
 from mcp.types import EmbeddedResource, ImageContent, TextContent
 
 from mcp_agent.core.prompt import Prompt
+from mcp_agent.llm.provider_types import Provider
 from mcp_agent.llm.providers.multipart_converter_anthropic import (
     AnthropicConverter,
 )
 from mcp_agent.llm.providers.sampling_converter_anthropic import (
     AnthropicSamplingConverter,
 )
+from mcp_agent.mcp.interfaces import ModelT
 from mcp_agent.mcp.prompt_message_multipart import PromptMessageMultipart
 
 if TYPE_CHECKING:
@@ -50,13 +51,26 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
     selecting appropriate tools, and determining what information to retain.
     """
 
+    # Anthropic-specific parameter exclusions
+    ANTHROPIC_EXCLUDE_FIELDS = {
+        AugmentedLLM.PARAM_MESSAGES,
+        AugmentedLLM.PARAM_MODEL,
+        AugmentedLLM.PARAM_SYSTEM_PROMPT,
+        AugmentedLLM.PARAM_STOP_SEQUENCES,
+        AugmentedLLM.PARAM_MAX_TOKENS,
+        AugmentedLLM.PARAM_METADATA,
+        AugmentedLLM.PARAM_USE_HISTORY,
+        AugmentedLLM.PARAM_MAX_ITERATIONS,
+        AugmentedLLM.PARAM_PARALLEL_TOOL_CALLS,
+    }
+
     def __init__(self, *args, **kwargs) -> None:
-        self.provider = "Anthropic"
         # Initialize logger - keep it simple without name reference
         self.logger = get_logger(__name__)
 
-        # Now call super().__init__
-        super().__init__(*args, type_converter=AnthropicSamplingConverter, **kwargs)
+        super().__init__(
+            *args, provider=Provider.ANTHROPIC, type_converter=AnthropicSamplingConverter, **kwargs
+        )
 
     def _initialize_default_params(self, kwargs: dict) -> RequestParams:
         """Initialize Anthropic-specific default parameters"""
@@ -65,7 +79,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
             maxTokens=4096,  # default haiku3
             systemPrompt=self.instruction,
             parallel_tool_calls=True,
-            max_iterations=10,
+            max_iterations=20,
             use_history=True,
         )
 
@@ -73,7 +87,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
         assert self.context.config
         return self.context.config.anthropic.base_url if self.context.config.anthropic else None
 
-    async def generate_internal(
+    async def _anthropic_completion(
         self,
         message_param,
         request_params: RequestParams | None = None,
@@ -83,7 +97,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
         Override this method to use a different LLM.
         """
 
-        api_key = self._api_key(self.context.config)
+        api_key = self._api_key()
         base_url = self._base_url()
         if base_url and base_url.endswith("/v1"):
             base_url = base_url.rstrip("/v1")
@@ -100,7 +114,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
 
         # Always include prompt messages, but only include conversation history
         # if use_history is True
-        messages.extend(self.history.get(include_history=params.use_history))
+        messages.extend(self.history.get(include_completion_history=params.use_history))
 
         messages.append(message_param)
 
@@ -120,7 +134,8 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
 
         for i in range(params.max_iterations):
             self._log_chat_progress(self.chat_turn(), model=model)
-            arguments = {
+            # Create base arguments dictionary
+            base_args = {
                 "model": model,
                 "messages": messages,
                 "system": self.instruction or params.systemPrompt,
@@ -129,10 +144,12 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
             }
 
             if params.maxTokens is not None:
-                arguments["max_tokens"] = params.maxTokens
+                base_args["max_tokens"] = params.maxTokens
 
-            if params.metadata:
-                arguments = {**arguments, **params.metadata}
+            # Use the base class method to prepare all arguments with Anthropic-specific exclusions
+            arguments = self.prepare_provider_arguments(
+                base_args, params, self.ANTHROPIC_EXCLUDE_FIELDS
+            )
 
             self.logger.debug(f"{arguments}")
 
@@ -265,7 +282,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
         # Keep the prompt messages separate
         if params.use_history:
             # Get current prompt messages
-            prompt_messages = self.history.get(include_history=False)
+            prompt_messages = self.history.get(include_completion_history=False)
 
             # Calculate new conversation messages (excluding prompts)
             new_messages = messages[len(prompt_messages) :]
@@ -276,27 +293,6 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
         self._log_chat_finished(model=model)
 
         return responses
-
-    def _api_key(self, config):
-        api_key = None
-
-        if hasattr(config, "anthropic") and config.anthropic:
-            api_key = config.anthropic.api_key
-            if api_key == "<your-api-key-here>":
-                api_key = None
-
-        if api_key is None:
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-
-        if not api_key:
-            raise ProviderKeyError(
-                "Anthropic API key not configured",
-                "The Anthropic API key is required but not set.\n"
-                "Add it to your configuration file under anthropic.api_key "
-                "or set the ANTHROPIC_API_KEY environment variable.",
-            )
-
-        return api_key
 
     async def generate_messages(
         self,
@@ -309,7 +305,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
         Override this method to use a different LLM.
 
         """
-        res = await self.generate_internal(
+        res = await self._anthropic_completion(
             message_param=message_param,
             request_params=request_params,
         )
@@ -319,6 +315,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
         self,
         multipart_messages: List["PromptMessageMultipart"],
         request_params: RequestParams | None = None,
+        is_template: bool = False,
     ) -> PromptMessageMultipart:
         # Check the last message role
         last_message = multipart_messages[-1]
@@ -331,7 +328,7 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
         for msg in messages_to_add:
             converted.append(AnthropicConverter.convert_to_anthropic(msg))
 
-        self.history.extend(converted, is_prompt=True)
+        self.history.extend(converted, is_prompt=is_template)
 
         if last_message.role == "user":
             self.logger.debug("Last message in prompt is from user, generating assistant response")
@@ -341,6 +338,28 @@ class AnthropicAugmentedLLM(AugmentedLLM[MessageParam, Message]):
             # For assistant messages: Return the last message content as text
             self.logger.debug("Last message in prompt is from assistant, returning it directly")
             return last_message
+
+    async def _apply_prompt_provider_specific_structured(
+        self,
+        multipart_messages: List[PromptMessageMultipart],
+        model: Type[ModelT],
+        request_params: RequestParams | None = None,
+    ) -> Tuple[ModelT | None, PromptMessageMultipart]:  # noqa: F821
+        request_params = self.get_request_params(request_params)
+
+        # TODO - convert this to use Tool Calling convention for Anthropic Structured outputs
+        multipart_messages[-1].add_text(
+            """YOU MUST RESPOND IN THE FOLLOWING FORMAT:
+            {schema}
+            RESPOND ONLY WITH THE JSON, NO PREAMBLE, CODE FENCES OR 'properties' ARE PERMISSABLE """.format(
+                schema=model.model_json_schema()
+            )
+        )
+
+        result: PromptMessageMultipart = await self._apply_prompt_provider_specific(
+            multipart_messages, request_params
+        )
+        return self._structured_from_multipart(result, model)
 
     @classmethod
     def convert_message_to_message_param(cls, message: Message, **kwargs) -> MessageParam:

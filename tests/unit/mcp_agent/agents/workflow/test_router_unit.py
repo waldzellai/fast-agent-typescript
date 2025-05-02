@@ -5,7 +5,7 @@ Unit tests for the router agent, covering models and core functionality.
 import pytest
 
 from mcp_agent.agents.agent import Agent
-from mcp_agent.agents.workflow.router_agent import RouterAgent, RouterResult, RoutingResponse
+from mcp_agent.agents.workflow.router_agent import RouterAgent, RoutingResponse
 from mcp_agent.core.agent_types import AgentConfig
 from mcp_agent.core.exceptions import AgentConfigError
 from mcp_agent.core.prompt import Prompt
@@ -34,37 +34,12 @@ def test_routing_response_model():
     assert response.reasoning is None
 
 
-def test_router_result_model():
-    """Test the RouterResult model creation."""
-    # Create an agent for testing
-    agent = Agent(config=AgentConfig(name="test_agent", instruction="Test agent description"))
-
-    # Create a router result
-    result = RouterResult(
-        result=agent, confidence="high", reasoning="Perfect match for this request"
-    )
-
-    # Check values
-    assert result.result.name == "test_agent"
-    assert result.confidence == "high"
-    assert result.reasoning == "Perfect match for this request"
-
-    # Optional field
-    result = RouterResult(result=agent, confidence="low")
-    assert result.result.name == "test_agent"
-    assert result.confidence == "low"
-    assert result.reasoning is None
-
-
-# Router functionality tests
-
-
 @pytest.mark.asyncio
 async def test_disallows_empty_agents():
     """Test that RouterAgent raises AgentConfigError when no agents are provided."""
     # Attempt to create a router with no agents
     with pytest.raises(AgentConfigError):
-        RouterAgent(config=AgentConfig("test_router"), agents=[])
+        RouterAgent(config=AgentConfig(name="test_router"), agents=[])
 
 
 @pytest.mark.asyncio
@@ -89,7 +64,7 @@ async def test_invalid_llm_response():
 
     # Verify router generates appropriate error message
     response = await router.generate([Prompt.user("test request")])
-    assert "Could not determine appropriate agent" in response.all_text()
+    assert "No routing response received from LLM" in response.all_text()
 
 
 @pytest.mark.asyncio
@@ -99,14 +74,13 @@ async def test_single_agent_shortcircuit():
     agent = Agent(AgentConfig(name="only_agent", instruction="The only available agent"))
 
     # Create router with a single agent
-    router = RouterAgent(config=AgentConfig("test_router"), agents=[agent])
+    router = RouterAgent(config=AgentConfig(name="test_router"), agents=[agent])
     await router.initialize()
 
     # Test routing directly returns the single agent without LLM call
-    routing_result = await router._route_request("some request")
+    response, _ = await router._route_request("some request")
 
     # Verify result
-    assert routing_result is not None
-    assert routing_result.result.name == "only_agent"
-    assert routing_result.confidence == "high"
-    assert "Only one agent available" in routing_result.reasoning
+    assert response
+    assert response.agent == "only_agent"
+    assert response.confidence == "high"

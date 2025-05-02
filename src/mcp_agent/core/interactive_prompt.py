@@ -20,6 +20,7 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
+from mcp_agent.core.agent_types import AgentType
 from mcp_agent.core.enhanced_prompt import (
     get_argument_input,
     get_enhanced_input,
@@ -36,14 +37,14 @@ class InteractivePrompt:
     This is extracted from the original AgentApp implementation to support DirectAgentApp.
     """
 
-    def __init__(self, agent_types: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, agent_types: Optional[Dict[str, AgentType]] = None) -> None:
         """
         Initialize the interactive prompt.
 
         Args:
             agent_types: Dictionary mapping agent names to their types for display
         """
-        self.agent_types = agent_types or {}
+        self.agent_types: Dict[str, AgentType] = agent_types or {}
 
     async def prompt_loop(
         self,
@@ -97,7 +98,7 @@ class InteractivePrompt:
 
                 # Handle special commands - pass "True" to enable agent switching
                 command_result = await handle_special_commands(user_input, True)
-                
+
                 # Check if we should switch agents
                 if isinstance(command_result, dict):
                     if "switch_agent" in command_result:
@@ -113,11 +114,13 @@ class InteractivePrompt:
                         # Use the list_prompts_func directly
                         await self._list_prompts(list_prompts_func, agent)
                         continue
-                    elif "select_prompt" in command_result and (list_prompts_func and apply_prompt_func):
+                    elif "select_prompt" in command_result and (
+                        list_prompts_func and apply_prompt_func
+                    ):
                         # Handle prompt selection, using both list_prompts and apply_prompt
                         prompt_name = command_result.get("prompt_name")
                         prompt_index = command_result.get("prompt_index")
-                        
+
                         # If a specific index was provided (from /prompt <number>)
                         if prompt_index is not None:
                             # First get a list of all prompts to look up the index
@@ -125,24 +128,37 @@ class InteractivePrompt:
                             if not all_prompts:
                                 rich_print("[yellow]No prompts available[/yellow]")
                                 continue
-                                
+
                             # Check if the index is valid
                             if 1 <= prompt_index <= len(all_prompts):
                                 # Get the prompt at the specified index (1-based to 0-based)
                                 selected_prompt = all_prompts[prompt_index - 1]
                                 # Use the already created namespaced_name to ensure consistency
-                                await self._select_prompt(list_prompts_func, apply_prompt_func, agent, selected_prompt["namespaced_name"])
+                                await self._select_prompt(
+                                    list_prompts_func,
+                                    apply_prompt_func,
+                                    agent,
+                                    selected_prompt["namespaced_name"],
+                                )
                             else:
-                                rich_print(f"[red]Invalid prompt number: {prompt_index}. Valid range is 1-{len(all_prompts)}[/red]")
+                                rich_print(
+                                    f"[red]Invalid prompt number: {prompt_index}. Valid range is 1-{len(all_prompts)}[/red]"
+                                )
                                 # Show the prompt list for convenience
                                 await self._list_prompts(list_prompts_func, agent)
                         else:
                             # Use the name-based selection
-                            await self._select_prompt(list_prompts_func, apply_prompt_func, agent, prompt_name)
+                            await self._select_prompt(
+                                list_prompts_func, apply_prompt_func, agent, prompt_name
+                            )
                         continue
 
-                # Skip further processing if command was handled
-                if command_result:
+                # Skip further processing if:
+                # 1. The command was handled (command_result is truthy)
+                # 2. The original input was a dictionary (special command like /prompt)
+                # 3. The command result itself is a dictionary (special command handling result)
+                # This fixes the issue where /prompt without arguments gets sent to the LLM
+                if command_result or isinstance(user_input, dict) or isinstance(command_result, dict):
                     continue
 
                 if user_input.upper() == "STOP":
@@ -158,11 +174,11 @@ class InteractivePrompt:
     async def _get_all_prompts(self, list_prompts_func, agent_name):
         """
         Get a list of all available prompts.
-        
+
         Args:
             list_prompts_func: Function to get available prompts
             agent_name: Name of the agent
-            
+
         Returns:
             List of prompt info dictionaries, sorted by server and name
         """
@@ -171,7 +187,7 @@ class InteractivePrompt:
             # the agent_name parameter should never be used as a server name
             prompt_servers = await list_prompts_func(None)
             all_prompts = []
-            
+
             # Process the returned prompt servers
             if prompt_servers:
                 # First collect all prompts
@@ -179,44 +195,51 @@ class InteractivePrompt:
                     if prompts_info and hasattr(prompts_info, "prompts") and prompts_info.prompts:
                         for prompt in prompts_info.prompts:
                             # Use the SEP constant for proper namespacing
-                            all_prompts.append({
-                                "server": server_name,
-                                "name": prompt.name,
-                                "namespaced_name": f"{server_name}{SEP}{prompt.name}",
-                                "description": getattr(prompt, "description", "No description"),
-                                "arg_count": len(getattr(prompt, "arguments", [])),
-                                "arguments": getattr(prompt, "arguments", [])
-                            })
+                            all_prompts.append(
+                                {
+                                    "server": server_name,
+                                    "name": prompt.name,
+                                    "namespaced_name": f"{server_name}{SEP}{prompt.name}",
+                                    "description": getattr(prompt, "description", "No description"),
+                                    "arg_count": len(getattr(prompt, "arguments", [])),
+                                    "arguments": getattr(prompt, "arguments", []),
+                                }
+                            )
                     elif isinstance(prompts_info, list) and prompts_info:
                         for prompt in prompts_info:
                             if isinstance(prompt, dict) and "name" in prompt:
-                                all_prompts.append({
-                                    "server": server_name,
-                                    "name": prompt["name"],
-                                    "namespaced_name": f"{server_name}{SEP}{prompt['name']}",
-                                    "description": prompt.get("description", "No description"),
-                                    "arg_count": len(prompt.get("arguments", [])),
-                                    "arguments": prompt.get("arguments", [])
-                                })
+                                all_prompts.append(
+                                    {
+                                        "server": server_name,
+                                        "name": prompt["name"],
+                                        "namespaced_name": f"{server_name}{SEP}{prompt['name']}",
+                                        "description": prompt.get("description", "No description"),
+                                        "arg_count": len(prompt.get("arguments", [])),
+                                        "arguments": prompt.get("arguments", []),
+                                    }
+                                )
                             else:
-                                all_prompts.append({
-                                    "server": server_name,
-                                    "name": str(prompt),
-                                    "namespaced_name": f"{server_name}{SEP}{str(prompt)}",
-                                    "description": "No description",
-                                    "arg_count": 0,
-                                    "arguments": []
-                                })
-                
+                                all_prompts.append(
+                                    {
+                                        "server": server_name,
+                                        "name": str(prompt),
+                                        "namespaced_name": f"{server_name}{SEP}{str(prompt)}",
+                                        "description": "No description",
+                                        "arg_count": 0,
+                                        "arguments": [],
+                                    }
+                                )
+
                 # Sort prompts by server and name for consistent ordering
                 all_prompts.sort(key=lambda p: (p["server"], p["name"]))
-            
+
             return all_prompts
-        
+
         except Exception as e:
             import traceback
 
             from rich import print as rich_print
+
             rich_print(f"[red]Error getting prompts: {e}[/red]")
             rich_print(f"[dim]{traceback.format_exc()}[/dim]")
             return []
@@ -238,11 +261,11 @@ class InteractivePrompt:
         try:
             # Directly call the list_prompts function for this agent
             rich_print(f"\n[bold]Fetching prompts for agent [cyan]{agent_name}[/cyan]...[/bold]")
-            
+
             # Get all prompts using the helper function - pass None as server name
             # to get prompts from all available servers
             all_prompts = await self._get_all_prompts(list_prompts_func, None)
-            
+
             if all_prompts:
                 # Create a table for better display
                 table = Table(title="Available MCP Prompts")
@@ -251,7 +274,7 @@ class InteractivePrompt:
                 table.add_column("Prompt Name", style="bright_blue")
                 table.add_column("Description")
                 table.add_column("Args", justify="center")
-                
+
                 # Add prompts to table
                 for i, prompt in enumerate(all_prompts):
                     table.add_row(
@@ -259,11 +282,11 @@ class InteractivePrompt:
                         prompt["server"],
                         prompt["name"],
                         prompt["description"],
-                        str(prompt["arg_count"])
+                        str(prompt["arg_count"]),
                     )
-                
+
                 console.print(table)
-                
+
                 # Add usage instructions
                 rich_print("\n[bold]Usage:[/bold]")
                 rich_print("  • Use [cyan]/prompt <number>[/cyan] to select a prompt by number")
@@ -272,10 +295,13 @@ class InteractivePrompt:
                 rich_print("[yellow]No prompts available[/yellow]")
         except Exception as e:
             import traceback
+
             rich_print(f"[red]Error listing prompts: {e}[/red]")
             rich_print(f"[dim]{traceback.format_exc()}[/dim]")
 
-    async def _select_prompt(self, list_prompts_func, apply_prompt_func, agent_name, requested_name=None) -> None:
+    async def _select_prompt(
+        self, list_prompts_func, apply_prompt_func, agent_name, requested_name=None
+    ) -> None:
         """
         Select and apply a prompt.
 
@@ -293,7 +319,7 @@ class InteractivePrompt:
         try:
             # Get all available prompts directly from the list_prompts function
             rich_print(f"\n[bold]Fetching prompts for agent [cyan]{agent_name}[/cyan]...[/bold]")
-            # IMPORTANT: list_prompts_func gets MCP server prompts, not agent prompts 
+            # IMPORTANT: list_prompts_func gets MCP server prompts, not agent prompts
             # So we pass None to get prompts from all servers, not using agent_name as server name
             prompt_servers = await list_prompts_func(None)
 
@@ -514,9 +540,7 @@ class InteractivePrompt:
 
             # Apply the prompt
             namespaced_name = selected_prompt["namespaced_name"]
-            rich_print(
-                f"\n[bold]Applying prompt [cyan]{namespaced_name}[/cyan]...[/bold]"
-            )
+            rich_print(f"\n[bold]Applying prompt [cyan]{namespaced_name}[/cyan]...[/bold]")
 
             # Call apply_prompt function with the prompt name and arguments
             await apply_prompt_func(namespaced_name, arg_values, agent_name)

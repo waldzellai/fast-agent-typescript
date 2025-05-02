@@ -93,6 +93,9 @@ class MCPServerSettings(BaseModel):
     sampling: MCPSamplingSettings | None = None
     """Sampling settings for this Client/Server pair"""
 
+    cwd: str | None = None
+    """Working directory for the executed server command."""
+
 
 class MCPSettings(BaseModel):
     """Configuration for all MCP servers."""
@@ -139,6 +142,19 @@ class DeepSeekSettings(BaseModel):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
 
+class GoogleSettings(BaseModel):
+    """
+    Settings for using OpenAI models in the fast-agent application.
+    """
+
+    api_key: str | None = None
+    # reasoning_effort: Literal["low", "medium", "high"] = "medium"
+
+    base_url: str | None = None
+
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+
 class GenericSettings(BaseModel):
     """
     Settings for using OpenAI models in the fast-agent application.
@@ -149,28 +165,18 @@ class GenericSettings(BaseModel):
     base_url: str | None = None
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-    
+
 
 class OpenRouterSettings(BaseModel):
     """
     Settings for using OpenRouter models via its OpenAI-compatible API.
     """
+
     api_key: str | None = None
-    
-    base_url: str | None = None # Optional override, defaults handled in provider
+
+    base_url: str | None = None  # Optional override, defaults handled in provider
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-
-
-class TemporalSettings(BaseModel):
-    """
-    Temporal settings for the fast-agent application.
-    """
-
-    host: str
-    namespace: str = "default"
-    task_queue: str
-    api_key: str | None = None
 
 
 class OpenTelemetrySettings(BaseModel):
@@ -178,13 +184,11 @@ class OpenTelemetrySettings(BaseModel):
     OTEL settings for the fast-agent application.
     """
 
-    enabled: bool = True
+    enabled: bool = False
 
     service_name: str = "fast-agent"
-    service_instance_id: str | None = None
-    service_version: str | None = None
 
-    otlp_endpoint: str | None = None
+    otlp_endpoint: str = "http://localhost:4318/v1/traces"
     """OTLP endpoint for OpenTelemetry tracing"""
 
     console_debug: bool = False
@@ -253,16 +257,14 @@ class Settings(BaseSettings):
     mcp: MCPSettings | None = MCPSettings()
     """MCP config, such as MCP servers"""
 
-    execution_engine: Literal["asyncio", "temporal"] = "asyncio"
+    execution_engine: Literal["asyncio"] = "asyncio"
     """Execution engine for the fast-agent application"""
 
     default_model: str | None = "haiku"
     """
     Default model for agents. Format is provider.model_name.<reasoning_effort>, for example openai.o3-mini.low
-    Aliases are provided for common models e.g. sonnet, haiku, gpt-4o, o3-mini etc.
+    Aliases are provided for common models e.g. sonnet, haiku, gpt-4.1, o3-mini etc.
     """
-    temporal: TemporalSettings | None = None
-    """Settings for Temporal workflow orchestration"""
 
     anthropic: AnthropicSettings | None = None
     """Settings for using Anthropic models in the fast-agent application"""
@@ -274,6 +276,9 @@ class Settings(BaseSettings):
     """Settings for using OpenAI models in the fast-agent application"""
 
     deepseek: DeepSeekSettings | None = None
+    """Settings for using DeepSeek models in the fast-agent application"""
+
+    google: GoogleSettings | None = None
     """Settings for using DeepSeek models in the fast-agent application"""
 
     openrouter: OpenRouterSettings | None = None
@@ -294,8 +299,6 @@ class Settings(BaseSettings):
         while current_dir != current_dir.parent:
             for filename in [
                 "fastagent.config.yaml",
-                "mcp-agent.config.yaml",
-                "mcp_agent.config.yaml",
             ]:
                 config_path = current_dir / filename
                 if config_path.exists():
@@ -367,8 +370,6 @@ def get_settings(config_path: str | None = None) -> Settings:
             while current_dir != current_dir.parent and not found_secrets:
                 for secrets_filename in [
                     "fastagent.secrets.yaml",
-                    "mcp-agent.secrets.yaml",
-                    "mcp_agent.secrets.yaml",
                 ]:
                     secrets_file = current_dir / secrets_filename
                     if secrets_file.exists():

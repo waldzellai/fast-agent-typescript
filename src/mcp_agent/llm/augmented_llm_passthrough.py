@@ -9,6 +9,7 @@ from mcp_agent.llm.augmented_llm import (
     MessageParamT,
     RequestParams,
 )
+from mcp_agent.llm.provider_types import Provider
 from mcp_agent.logging.logger import get_logger
 from mcp_agent.mcp.prompt_message_multipart import PromptMessageMultipart
 
@@ -25,9 +26,10 @@ class PassthroughLLM(AugmentedLLM):
     parallel workflow where no fan-in aggregation is needed.
     """
 
-    def __init__(self, name: str = "Passthrough", **kwargs: dict[str, Any]) -> None:
-        super().__init__(name=name, **kwargs)
-        self.provider = "fast-agent"
+    def __init__(
+        self, provider=Provider.FAST_AGENT, name: str = "Passthrough", **kwargs: dict[str, Any]
+    ) -> None:
+        super().__init__(name=name, provider=provider, **kwargs)
         self.logger = get_logger(__name__)
         self._messages = [PromptMessage]
         self._fixed_response: str | None = None
@@ -141,7 +143,6 @@ class PassthroughLLM(AugmentedLLM):
     ) -> PromptMessageMultipart:
         last_message = multipart_messages[-1]
 
-        # TODO -- improve when we support Audio/Multimodal gen
         if self.is_tool_call(last_message):
             result = Prompt.assistant(await self.generate_str(last_message.first_text()))
             await self.show_assistant_message(result.first_text())
@@ -156,6 +157,7 @@ class PassthroughLLM(AugmentedLLM):
             await self.show_assistant_message(self._fixed_response)
             return Prompt.assistant(self._fixed_response)
         else:
+            # TODO -- improve when we support Audio/Multimodal gen models e.g. gemini . This should really just return the input as "assistant"...
             concatenated: str = "\n".join(message.all_text() for message in multipart_messages)
             await self.show_assistant_message(concatenated)
             return Prompt.assistant(concatenated)

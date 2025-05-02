@@ -133,11 +133,13 @@ async def create_agents_by_type(
             },
         )
 
+        # Compare type string from config with Enum value
         if agent_data["type"] == agent_type.value:
             # Get common configuration
             config = agent_data["config"]
 
-            # Type-specific initialization
+            # Type-specific initialization based on the Enum type
+            # Note: Above we compared string values from config, here we compare Enum objects directly
             if agent_type == AgentType.BASIC:
                 # Create a basic agent
                 agent = Agent(
@@ -173,6 +175,7 @@ async def create_agents_by_type(
                     config=config,
                     context=app_instance.context,
                     agents=child_agents,
+                    plan_iterations=agent_data.get("plan_iterations", 5),
                     plan_type=agent_data.get("plan_type", "full"),
                 )
 
@@ -338,6 +341,7 @@ async def create_agents_in_dependency_order(
     # Create agent proxies for each group in dependency order
     for group in dependencies:
         # Create basic agents first
+        # Note: We compare string values from config with the Enum's string value
         if AgentType.BASIC.value in [agents_dict[name]["type"] for name in group]:
             basic_agents = await create_agents_by_type(
                 app_instance,

@@ -1,8 +1,9 @@
 """Module for converting log events to progress events."""
 
-from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+
+from pydantic import BaseModel
 
 from mcp_agent.logging.events import Event
 
@@ -24,8 +25,7 @@ class ProgressAction(str, Enum):
     FATAL_ERROR = "Error"
 
 
-@dataclass
-class ProgressEvent:
+class ProgressEvent(BaseModel):
     """Represents a progress event converted from a log event."""
 
     action: ProgressAction
@@ -87,8 +87,8 @@ def convert_log_event(event: Event) -> Optional[ProgressEvent]:
             target = event_data.get("target", "unknown")
 
     return ProgressEvent(
-        ProgressAction(progress_action),
-        target,
-        details,
+        action=ProgressAction(progress_action),
+        target=target,
+        details=details,
         agent_name=event_data.get("agent_name"),
     )

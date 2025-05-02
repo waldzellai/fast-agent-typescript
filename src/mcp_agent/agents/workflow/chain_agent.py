@@ -26,9 +26,9 @@ class ChainAgent(BaseAgent):
 
     # TODO -- consider adding "repeat" mode
     @property
-    def agent_type(self) -> str:
+    def agent_type(self) -> AgentType:
         """Return the type of this agent."""
-        return AgentType.CHAIN.value
+        return AgentType.CHAIN
 
     def __init__(
         self,

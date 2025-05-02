@@ -64,11 +64,11 @@ class EvaluatorOptimizerAgent(BaseAgent):
     for refinement, continuing until a quality threshold is reached or a maximum
     number of refinement cycles is completed.
     """
-    
+
     @property
-    def agent_type(self) -> str:
+    def agent_type(self) -> AgentType:
         """Return the type of this agent."""
-        return AgentType.EVALUATOR_OPTIMIZER.value
+        return AgentType.EVALUATOR_OPTIMIZER
 
     def __init__(
         self,

@@ -66,7 +66,7 @@ class Agent(BaseAgent):
         agent_name_str = str(self.name)
 
         # Create agent_types dictionary with just this agent
-        agent_types = {agent_name_str: self.agent_type}
+        agent_types = {agent_name_str: self.agent_type.value}
 
         # Create the interactive prompt
         prompt = InteractivePrompt(agent_types=agent_types)
@@ -84,7 +84,7 @@ class Agent(BaseAgent):
         async def list_prompts_wrapper(agent_name):
             # Always call list_prompts on this agent regardless of agent_name
             return await self.list_prompts()
-            
+
         # Define wrapper for list_resources function
         async def list_resources_wrapper(agent_name):
             # Always call list_resources on this agent regardless of agent_name
