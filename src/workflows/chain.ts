@@ -28,10 +28,8 @@ export class Chain extends BaseWorkflow {
     super(
       config.name,
       'chain',
-      {
-        ...config,
-        agent_type: AgentType.CHAIN
-      }
+      AgentType.CHAIN,
+      config
     );
     
     this.sequence = config.sequence || [];

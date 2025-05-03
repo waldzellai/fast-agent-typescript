@@ -46,10 +46,8 @@ export class EvaluatorOptimizer extends BaseWorkflow {
     super(
       config.name,
       'evaluator_optimizer',
-      {
-        ...config,
-        agent_type: AgentType.EVALUATOR_OPTIMIZER
-      }
+      AgentType.EVALUATOR_OPTIMIZER,
+      config
     );
     
     this.worker = config.worker;

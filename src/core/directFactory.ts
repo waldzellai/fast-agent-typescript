@@ -60,6 +60,8 @@ export function getModelFactory(
   defaultModel?: string,
   cliModel?: string,
 ): () => any {
+  // console.log("--- REAL getModelFactory CALLED ---");
+
   // Config has lowest precedence
   let modelSpec = defaultModel || context.config?.default_model;
 

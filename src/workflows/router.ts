@@ -23,10 +23,8 @@ export class Router extends BaseWorkflow {
     super(
       config.name,
       'router',
-      {
-        ...config,
-        agent_type: AgentType.ROUTER
-      }
+      AgentType.ROUTER,
+      config
     );
     
     this.routerAgents = config.router_agents || [];

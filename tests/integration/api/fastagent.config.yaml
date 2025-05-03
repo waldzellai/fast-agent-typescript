@@ -40,3 +40,14 @@ mcp:
     sse:
       transport: "sse"
       url: "http://localhost:8723/sse"
+    card_test:
+      command: "uv"
+      args: ["run", "mcp_tools_server.py"]
+    hyphen-test:
+      command: "uv"
+      args: ["run", "mcp_tools_server.py"]
+    # borrows config from prompt-server
+    cwd_test:
+      command: "prompt-server"
+      args: ["multi.txt"]
+      cwd: "../prompt-server/"

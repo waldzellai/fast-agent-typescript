@@ -2,7 +2,7 @@
 
 export * from './app';
 export * from './core/agentTypes';
-export * from './config';
+export * as ConfigModule from './config'; // Alias exports to avoid name clash
 export * from './logging/logger';
 export * from './executor/executor';
 export * from './executor/workflow';

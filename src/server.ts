@@ -3,7 +3,7 @@
 import { BaseAgent } from './mcpAgent';
 // Assuming FastMCP and MCPContext are part of an external library or need to be defined
 // For now, we'll define placeholder interfaces/types to represent them
-interface FastMCP {
+export interface FastMCP {
   tool: (options: {
     name: string;
     description: string;

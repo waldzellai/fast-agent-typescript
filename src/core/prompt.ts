@@ -1,29 +1,60 @@
-import { PathLike } from "fs"; // Using PathLike as a stand-in for pathlib.Path type hint
+import { PathLike } from 'fs'; // Import PathLike
+import * as fs from 'fs';
+import * as path from 'path';
 
-// --- Placeholder Types and Type Guards (since @modelcontextprotocol/types is not found) ---
-export type Role = "user" | "assistant";
+// Basic mime type lookup based on extension
+const getMimeType = (filePath: string): string => {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case '.txt': return 'text/plain';
+    case '.json': return 'application/json';
+    case '.png': return 'image/png';
+    case '.jpg':
+    case '.jpeg': return 'image/jpeg';
+    case '.gif': return 'image/gif';
+    // Add more common types as needed
+    default: return 'application/octet-stream'; // Default binary type
+  }
+};
+
+// Define Role enum (if not already defined elsewhere)
+export enum Role {
+  User = "user",
+  Assistant = "assistant",
+  System = "system",
+}
 
 export interface TextContent {
   type: "text";
   text: string;
 }
 
+// UPDATED ImageContent interface to match mcpContent.ts
 export interface ImageContent {
   type: "image";
-  source: {
-    type: "base64"; // Assuming base64 for simplicity
-    media_type: string;
-    data: string;
+  // source: {
+  //   type: "base64";
+  //   media_type: string;
+  //   data: string;
+  // };
+  data: string; // Base64 encoded data
+  mimeType: string;
+}
+
+// UPDATED EmbeddedResource interface to match mcpContent.ts
+export interface EmbeddedResource {
+  type: "resource"; // Changed from 'resource_ref'
+  // uri: string;
+  // mimeType?: string;
+  resource: {
+      uri: string;
+      text?: string; // Optional text content if directly available
+      mimeType: string;
+      data?: string; // Optional base64 data for images/binary
   };
 }
 
-export interface EmbeddedResource {
-  type: "resource_ref";
-  uri: string;
-  // Add other potential fields if known
-}
-
-export type ContentPart = TextContent | ImageContent | EmbeddedResource; // Add other types as needed
+export type ContentPart = TextContent | ImageContent | EmbeddedResource; 
 
 export interface PromptMessage {
   role: Role;
@@ -62,26 +93,55 @@ export function isTextContent(obj: any): obj is TextContent {
   );
 }
 
+// UPDATED isImageContent type guard
 export function isImageContent(obj: any): obj is ImageContent {
   return (
     typeof obj === "object" &&
     obj !== null &&
     obj.type === "image" &&
-    typeof obj.source === "object"
+    // typeof obj.source === "object" // Old check
+    typeof obj.data === "string" && // New check
+    typeof obj.mimeType === "string" // New check
   );
 }
 
+// UPDATED isEmbeddedResource type guard
 export function isEmbeddedResource(obj: any): obj is EmbeddedResource {
   return (
     typeof obj === "object" &&
     obj !== null &&
-    obj.type === "resource_ref" &&
-    typeof obj.uri === "string"
+    // obj.type === "resource_ref" && // Old check
+    // typeof obj.uri === "string" // Old check
+    obj.type === "resource" && // New check
+    typeof obj.resource === "object" && // New check
+    typeof obj.resource.uri === "string" && // New check
+    typeof obj.resource.mimeType === "string" // New check
   );
 }
-// --- End Placeholders ---
-// Assuming a helper function exists or can be created to handle content conversion
-// For now, we'll define a placeholder type and function signature
+
+// Type guard for ReadResourceResult-like objects (duck typing)
+function isReadResourceResult(obj: any): obj is { contents: Array<Record<string, any> & { uri: string }> } {
+    return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        Array.isArray(obj.contents) &&
+        // Optional: check if items in contents look like resources
+        (obj.contents.length === 0 || 
+            (typeof obj.contents[0] === 'object' && obj.contents[0] !== null && 'uri' in obj.contents[0]))
+    );
+}
+
+// Type guard for TextResourceContents-like objects (duck typing)
+function isTextResourceContents(obj: any): obj is { uri: string; mimeType: string; text?: string } {
+    return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        typeof obj.uri === 'string' &&
+        typeof obj.mimeType === 'string'
+        // We don't strictly require 'text' as it might be binary
+    );
+}
+
 type MCPContentType = TextContent | ImageContent | EmbeddedResource;
 type InputContentItem =
   | string
@@ -92,26 +152,67 @@ type InputContentItem =
   | PromptMessage
   | PromptMessageMultipart;
 
-// Placeholder for the logic that was in Python's .mcp_content helpers
-// This function would inspect the item and return the appropriate ContentPart(s)
-// This is a simplified placeholder implementation. The actual implementation
-// would need file type detection, etc.
+// The core function to convert various inputs into an array of ContentPart
 function createContentParts(item: InputContentItem): ContentPart[] {
   if (typeof item === "string") {
-    // Basic check: assume string is text content
-    // A real implementation might check if it's a file path
+    // Check if it's a file path
+    try {
+        if (fs.existsSync(item)) {
+            const stats = fs.statSync(item);
+            if (stats.isFile()) {
+                const mimeType = getMimeType(item);
+                const buffer = fs.readFileSync(item);
+                const uri = path.resolve(item); // Get absolute path as URI
+
+                if (mimeType.startsWith('image/')) {
+                    return [{
+                        type: 'image',
+                        data: buffer.toString('base64'),
+                        mimeType: mimeType,
+                    }];
+                } else if (mimeType.startsWith('text/')) {
+                    // Create EmbeddedResource for text files
+                    return [{
+                        type: 'resource',
+                        resource: {
+                            uri: `file://${uri}`,
+                            text: buffer.toString('utf8'),
+                            mimeType: mimeType
+                        }
+                    }];
+                } else {
+                    // Create EmbeddedResource for other binary files
+                     return [{
+                        type: 'resource',
+                        resource: {
+                            uri: `file://${uri}`,
+                            mimeType: mimeType,
+                            // Optionally include base64 data for binary types if needed
+                            // data: buffer.toString('base64') 
+                        }
+                    }];
+                }
+            }
+        }
+    } catch (error) {
+        // If fs.existsSync or other fs operations fail, treat as string
+        console.warn(`Error accessing path '${item}': ${error}. Treating as text.`);
+    }
+    // If not a valid file path or error occurred, treat as plain text
     return [{ type: "text", text: item }];
   } else if (Buffer.isBuffer(item)) {
-    // Assume buffer is image data (needs proper handling/encoding)
-    // Placeholder: requires actual image processing logic
+    // Assume buffer is image data (defaulting to png for now)
+    // A more robust implementation might require explicit mime type
     return [
       {
         type: "image",
-        source: {
-          type: "base64",
-          media_type: "image/png",
-          data: item.toString("base64"),
-        },
+        // source: { // Old structure
+        //   type: "base64",
+        //   media_type: "image/png", 
+        //   data: item.toString("base64"),
+        // },
+        data: item.toString("base64"), // New structure
+        mimeType: "image/png" // New structure - assuming png
       },
     ];
   } else if (
@@ -119,7 +220,7 @@ function createContentParts(item: InputContentItem): ContentPart[] {
     isImageContent(item) ||
     isEmbeddedResource(item)
   ) {
-    // If it's already a valid ContentPart type
+    // If it's already a valid ContentPart type (matching updated interfaces)
     return [item];
   } else if (isPromptMessage(item)) {
     // Extract content part(s) from PromptMessage content
@@ -131,6 +232,32 @@ function createContentParts(item: InputContentItem): ContentPart[] {
   } else if (isPromptMessageMultipart(item)) {
     // Extract content parts from PromptMessageMultipart
     return item.content;
+  } else if (isReadResourceResult(item)) { // Handle ReadResourceResult 
+    // Process each item in the 'contents' array
+    // Assuming contents are TextResourceContents-like
+    return item.contents.flatMap((resourceItem: any) => {
+        if (typeof resourceItem === 'object' && resourceItem !== null && resourceItem.uri) {
+            // Convert TextResourceContents-like to EmbeddedResource
+            return [{
+                 type: 'resource',
+                 resource: { // Ensure structure matches EmbeddedResource
+                    uri: resourceItem.uri,
+                    text: resourceItem.text,
+                    mimeType: resourceItem.mimeType
+                 }
+             }] as EmbeddedResource[];
+        }
+        return []; // Ignore malformed items
+    });
+  } else if (isTextResourceContents(item)) { 
+      return [{
+          type: 'resource',
+          resource: {
+              uri: item.uri,
+              mimeType: item.mimeType,
+              text: item.text // Include text if present
+          }
+      }];
   } else if (
     typeof item === "object" &&
     item !== null &&
@@ -143,11 +270,12 @@ function createContentParts(item: InputContentItem): ContentPart[] {
       return [{ type: "text", text: content }];
     } else if (Array.isArray(content)) {
       // Assuming content is already an array of ContentPart
+      // Need to be careful here - might need further validation/conversion
       return content as ContentPart[];
     }
   }
   // Fallback or throw error for unsupported types
-  console.warn(`Unsupported content item type: ${typeof item}`);
+  console.warn(`Unsupported content item type: ${typeof item} or structure mismatch.`);
   return [];
 }
 
@@ -177,7 +305,7 @@ export class Prompt {
    * @returns A PromptMessageMultipart with user role and the specified content.
    */
   static user(...contentItems: InputContentItem[]): PromptMessageMultipart {
-    return Prompt.message(...contentItems, { role: "user" });
+    return Prompt.message(...contentItems, { role: Role.User }); 
   }
 
   /**
@@ -189,7 +317,7 @@ export class Prompt {
   static assistant(
     ...contentItems: InputContentItem[]
   ): PromptMessageMultipart {
-    return Prompt.message(...contentItems, { role: "assistant" });
+    return Prompt.message(...contentItems, { role: Role.Assistant });
   }
 
   /**
@@ -200,46 +328,37 @@ export class Prompt {
    * @returns A PromptMessageMultipart with the specified role and content.
    */
   static message(
-    ...contentItems:
-      | [...InputContentItem[], { role: Role }]
-      | InputContentItem[]
+    ...args: (InputContentItem | { role: Role })[]
   ): PromptMessageMultipart {
-    let role: Role = "user"; // Default role
-    let items: InputContentItem[] = [];
+    let role: Role = Role.User; // Default role using enum
+    let contentItems: InputContentItem[] = [];
 
-    // Check if the last argument is a role object
-    if (
-      contentItems.length > 0 &&
-      typeof contentItems[contentItems.length - 1] === "object" &&
-      contentItems[contentItems.length - 1] !== null &&
-      !Array.isArray(contentItems[contentItems.length - 1]) &&
-      !Buffer.isBuffer(contentItems[contentItems.length - 1]) &&
-      "role" in (contentItems[contentItems.length - 1] as object)
-    ) {
-      role = (contentItems.pop() as { role: Role }).role;
-      items = contentItems as InputContentItem[];
-    } else {
-      items = contentItems as InputContentItem[];
+    // Separate role object from content items
+    if (args.length > 0) {
+        const lastArg = args[args.length - 1];
+        // Check if it's an object, has ONLY 'role' key, and 'role' is a valid Role enum value
+        if (
+            typeof lastArg === "object" &&
+            lastArg !== null &&
+            !Array.isArray(lastArg) && 
+            Object.keys(lastArg).length === 1 && 
+            'role' in lastArg &&
+            Object.values(Role).includes((lastArg as {role: Role}).role) 
+        ) {
+            role = (lastArg as { role: Role }).role;
+            contentItems = args.slice(0, -1) as InputContentItem[]; // All args except the last
+        } else {
+            // Last arg is not the role object, treat all args as content
+            contentItems = args as InputContentItem[];
+        }
+    } // If args is empty, role stays User, contentItems stays empty.
+
+    // Flatten content parts from all input items
+    const combinedContent: ContentPart[] = [];
+    for (const item of contentItems) {
+        const parts = createContentParts(item);
+        combinedContent.push(...parts); 
     }
-
-    // Handle single PromptMessage or PromptMessageMultipart input
-    if (items.length === 1) {
-      const item = items[0];
-      if (isPromptMessage(item)) {
-        // If content is string, wrap in TextContent part
-        const contentParts =
-          typeof item.content === "string"
-            ? [{ type: "text", text: item.content } as TextContent]
-            : item.content; // Assuming item.content is ContentPart[] otherwise
-        return { role, content: contentParts };
-      } else if (isPromptMessageMultipart(item)) {
-        // Keep the content but override the role
-        return { role, content: item.content };
-      }
-    }
-
-    // Process multiple content items using the placeholder logic
-    const combinedContent: ContentPart[] = items.flatMap(createContentParts);
 
     return {
       role,

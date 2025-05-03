@@ -27,6 +27,7 @@ import {
   OrchestratorConfig,
   EvaluatorOptimizer,
   EvaluatorOptimizerConfig,
+  BaseWorkflow,
 } from './workflows';
 
 // Type for agent function
@@ -83,7 +84,7 @@ export class FastAgent {
   private agents: Record<string, { config: AgentConfig; func: AgentFunction }> =
     {};
   private workflows: Record<string, { config: AgentConfig; type: string }> = {};
-  private context: Context = { config: {} };
+  private context: Context = { config: { mcp: { servers: {} } } };
   private cliModel?: string;
   private createdAgents: Record<string, BaseAgent> = {};
 
@@ -132,21 +133,28 @@ export class FastAgent {
 
         // Merge MCP server environment variables
         if (secrets.mcp?.servers) {
-          if (!this.context.config!.mcp) {
-            this.context.config!.mcp = { servers: {} };
-          } else if (!this.context.config!.mcp.servers) {
-            this.context.config!.mcp.servers = {};
+          // Ensure nested structure exists
+          if (!this.context.config) {
+            this.context.config = {};
+          }
+          if (!this.context.config.mcp) {
+            this.context.config.mcp = { servers: {} };
+          } else if (!this.context.config.mcp.servers) {
+            this.context.config.mcp.servers = {};
           }
 
-          for (const [serverName, serverConfig] of Object.entries(
-            secrets.mcp.servers
-          )) {
-            if (!this.context.config!.mcp.servers[serverName]) {
-              this.context.config!.mcp.servers[serverName] = {};
-            }
+          // Only proceed if servers object is confirmed to exist
+          if (this.context.config.mcp.servers) {
+            const servers = this.context.config.mcp.servers; // Now TS knows 'servers' is defined
 
-            if ((serverConfig as any).env) {
-              this.context.config!.mcp.servers[serverName].env = (
+            for (const [serverName, serverConfig] of Object.entries(
+              secrets.mcp.servers
+            )) {
+              // Use the guaranteed non-undefined local variable 'servers'
+              if (!servers[serverName]) {
+                servers[serverName] = {};
+              }
+              servers[serverName].env = (
                 serverConfig as any
               ).env;
             }
@@ -340,7 +348,13 @@ export class FastAgent {
     }
 
     try {
-      validateServerReferences(this.context, agentConfigs);
+      if (this.context.config && this.context.config.mcp) {
+        validateServerReferences(this.context as any, agentConfigs);
+      } else {
+        console.warn(
+          'Skipping server validation: context.config or context.config.mcp is missing.'
+        );
+      }
       validateWorkflowReferences(agentConfigs);
     } catch (error) {
       console.error('Validation error:', error);
@@ -370,9 +384,9 @@ export class FastAgent {
         // Create a model factory
         const modelFactory = getModelFactory(
           this.context,
-          agent.config.model,
-          agent.config.default_request_params,
-          this.context.config?.default_model,
+          agent.config.model ?? undefined, // Handle null case for model
+          (agent.config.default_request_params ?? undefined) as any, // Cast to 'any' to satisfy BaseRequestParams requirement, assuming runtime compatibility
+          this.context.config?.default_model, // Use optional chaining
           this.cliModel
         );
 
@@ -390,35 +404,36 @@ export class FastAgent {
     for (const [name, workflow] of Object.entries(this.workflows)) {
       try {
         let workflowInstance: BaseAgent;
+        let workflowInstanceSpecific: BaseWorkflow;
 
         // Create the workflow based on its type
         switch (workflow.type) {
           case 'chain':
-            workflowInstance = new Chain(
+            workflowInstanceSpecific = new Chain(
               workflow.config as ChainConfig,
               this.createdAgents
             );
             break;
           case 'router':
-            workflowInstance = new Router(
+            workflowInstanceSpecific = new Router(
               workflow.config as RouterConfig,
               this.createdAgents
             );
             break;
           case 'parallel':
-            workflowInstance = new Parallel(
+            workflowInstanceSpecific = new Parallel(
               workflow.config as ParallelConfig,
               this.createdAgents
             );
             break;
           case 'orchestrator':
-            workflowInstance = new Orchestrator(
+            workflowInstanceSpecific = new Orchestrator(
               workflow.config as OrchestratorConfig,
               this.createdAgents
             );
             break;
           case 'evaluator_optimizer':
-            workflowInstance = new EvaluatorOptimizer(
+            workflowInstanceSpecific = new EvaluatorOptimizer(
               workflow.config as EvaluatorOptimizerConfig,
               this.createdAgents
             );
@@ -427,8 +442,10 @@ export class FastAgent {
             throw new Error(`Unknown workflow type: ${workflow.type}`);
         }
 
+        workflowInstance = workflowInstanceSpecific;
+
         // Initialize the workflow
-        await workflowInstance.initialize();
+        await workflowInstanceSpecific.initialize();
 
         // Store the workflow instance
         this.createdAgents[name] = workflowInstance;

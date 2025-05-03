@@ -2,7 +2,7 @@
  * Base interface for all workflow types
  */
 import { Agent, BaseAgent } from '../mcpAgent';
-import { AgentConfig } from '../core/agentTypes';
+import { AgentConfig, AgentType } from '../core/agentTypes';
 
 export interface Workflow extends BaseAgent {
   /**
@@ -43,12 +43,14 @@ export interface Workflow extends BaseAgent {
 export abstract class BaseWorkflow implements Workflow {
   name: string;
   workflowType: string;
+  agentType: AgentType;
   config: AgentConfig;
   protected agents: Record<string, BaseAgent> = {};
   
-  constructor(name: string, workflowType: string, config: AgentConfig) {
+  constructor(name: string, workflowType: string, agentType: AgentType, config: AgentConfig) {
     this.name = name;
     this.workflowType = workflowType;
+    this.agentType = agentType;
     this.config = config;
   }
   

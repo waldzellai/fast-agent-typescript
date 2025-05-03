@@ -36,10 +36,8 @@ export class Parallel extends BaseWorkflow {
     super(
       config.name,
       'parallel',
-      {
-        ...config,
-        agent_type: AgentType.PARALLEL
-      }
+      AgentType.PARALLEL,
+      config
     );
     
     this.fanOut = config.fan_out || [];

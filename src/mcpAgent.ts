@@ -15,6 +15,7 @@ export interface BaseAgent {
   applyPrompt(promptName: string, args: any): Promise<string>;
   listPrompts(): Promise<string[]>;
   prompt(defaultPrompt?: string, agentName?: string): Promise<string>;
+  listResources(): Promise<string[]>; // Add missing method signature
 }
 
 export class InteractivePrompt {
@@ -397,15 +398,11 @@ export class Agent implements BaseAgent {
 
   /**
    * Attach an LLM to this agent for handling requests.
-   * @param llmFactory Factory function that creates an LLM instance
-   * @param _requestParams Optional request parameters
+   * @param llmFactory Factory function to create the LLM instance
    */
-  async attachLlm(
-    llmFactory: () => AugmentedLLMProtocol,
-    _requestParams?: any
-  ): Promise<void> {
+  async attachLlm(llmFactory: () => AugmentedLLMProtocol): Promise<void> {
+    // Call the factory to get the LLM instance and store it
     this._llm = llmFactory();
-    return Promise.resolve();
   }
 
   /**

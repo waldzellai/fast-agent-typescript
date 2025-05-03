@@ -30,10 +30,8 @@ export class Orchestrator extends BaseWorkflow {
     super(
       config.name,
       'orchestrator',
-      {
-        ...config,
-        agent_type: AgentType.ORCHESTRATOR
-      }
+      AgentType.ORCHESTRATOR, // Pass agentType
+      config // Pass config
     );
     
     this.orchestratorAgents = config.orchestrator_agents || [];

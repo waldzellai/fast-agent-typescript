@@ -589,42 +589,6 @@
       },
       "title": "OpenTelemetrySettings",
       "type": "object"
-    },
-    "TemporalSettings": {
-      "description": "Temporal settings for the fast-agent application.",
-      "properties": {
-        "host": {
-          "title": "Host",
-          "type": "string"
-        },
-        "namespace": {
-          "default": "default",
-          "title": "Namespace",
-          "type": "string"
-        },
-        "task_queue": {
-          "title": "Task Queue",
-          "type": "string"
-        },
-        "api_key": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Api Key"
-        }
-      },
-      "required": [
-        "host",
-        "task_queue"
-      ],
-      "title": "TemporalSettings",
-      "type": "object"
     }
   },
   "additionalProperties": true,
@@ -647,8 +611,7 @@
     "execution_engine": {
       "default": "asyncio",
       "enum": [
-        "asyncio",
-        "temporal"
+        "asyncio"
       ],
       "title": "Execution Engine",
       "type": "string",
@@ -665,18 +628,6 @@
       ],
       "default": "haiku",
       "title": "Default Model"
-    },
-    "temporal": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/TemporalSettings"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Settings for Temporal workflow orchestration"
     },
     "anthropic": {
       "anyOf": [
