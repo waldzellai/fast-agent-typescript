@@ -4,7 +4,7 @@
  * This class provides a simple interface for creating and running agents.
  */
 
-import { Agent, BaseAgent, HumanInputCallback, Context } from './mcpAgent';
+import { Agent, BaseAgent, Context } from './mcpAgent';
 import { AgentConfig, AgentType } from './core/agentTypes';
 import {
   validateServerReferences,
@@ -154,9 +154,7 @@ export class FastAgent {
               if (!servers[serverName]) {
                 servers[serverName] = {};
               }
-              servers[serverName].env = (
-                serverConfig as any
-              ).env;
+              servers[serverName].env = (serverConfig as any).env;
             }
           }
         }

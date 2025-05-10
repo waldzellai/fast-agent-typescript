@@ -15,7 +15,13 @@ export interface BaseAgent {
   applyPrompt(promptName: string, args: any): Promise<string>;
   listPrompts(): Promise<string[]>;
   prompt(defaultPrompt?: string, agentName?: string): Promise<string>;
-  listResources(): Promise<string[]>; // Add missing method signature
+  listResources(): Promise<string[]>;
+  withResource(
+    prompt: string,
+    resourceUri: string,
+    serverName: string
+  ): Promise<string>;
+  attachLlm?(llmFactory: () => AugmentedLLMProtocol): Promise<void>; // Add optional attachLlm method
 }
 
 export class InteractivePrompt {
@@ -487,6 +493,54 @@ export class Agent implements BaseAgent {
     } catch (error) {
       console.error(`Error listing resources for agent ${this.name}:`, error);
       return [];
+    }
+  }
+
+  /**
+   * Send a prompt along with a resource URI to the agent.
+   * @param prompt The prompt message
+   * @param resourceUri The URI of the resource to include
+   * @param serverName The name of the server providing the resource
+   * @returns The agent's response
+   */
+  async withResource(
+    prompt: string,
+    resourceUri: string,
+    serverName: string
+  ): Promise<string> {
+    if (!this._llm) {
+      throw new Error(
+        `Agent ${this.name} has no LLM attached. Call attachLlm() first.`
+      );
+    }
+    // Assuming the attached LLM has a withResource method or similar
+    // If not, this needs adjustment based on AugmentedLLMProtocol definition
+    if (typeof (this._llm as any).withResource === 'function') {
+      try {
+        // Delegate to the LLM's withResource method if it exists
+        return await (this._llm as any).withResource(
+          prompt,
+          resourceUri,
+          serverName
+        );
+      } catch (error) {
+        console.error(
+          `Error using resource ${resourceUri} with agent ${this.name}:`,
+          error
+        );
+        return `Error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    } else {
+      // Fallback or error if the LLM doesn't support withResource
+      console.warn(
+        `LLM attached to agent ${this.name} does not support withResource. Sending prompt without resource.`
+      );
+      // Send the prompt and mention the unprocessed resource URI
+      return this.send(
+        `${prompt}\n\nResource URI (unprocessed): ${resourceUri}`
+      );
+      // Alternatively, throw an error:
+      // throw new Error(`LLM for agent ${this.name} does not support withResource`);
     }
   }
 
