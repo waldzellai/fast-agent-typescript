@@ -41,9 +41,15 @@ interface WeatherForecast {
   summary: string;
 }
 
+// Runtime placeholder so we can pass a value where a runtime validator might be expected
+// while keeping the compile-time type separate.
+// In production, this could be replaced with a zod schema or similar runtime validator.
+const WeatherForecast: unknown = {};
+
 // --- Define Mock LLMs ---
 const textPromptLlm = {
-  send: jest.fn().mockImplementation((message: string) => {
+  // Generic mock that echoes a canned cat story regardless of input type
+  send: jest.fn().mockImplementation((_message: unknown) => {
     // Generate a 50-word story about cats
     return Promise.resolve(
       'Whiskers prowled the moonlit garden, tail twitching with anticipation. A rustling sound caught her attention. Mouse? Bird? She crouched low, ready to pounce. Her feline instincts took over as she leaped gracefully. The butterfly escaped, dancing just beyond reach. Whiskers watched, plotting her next move. Tomorrow, she thought. Tomorrow the butterfly would be hers.'
@@ -61,7 +67,7 @@ const textPromptLlm = {
 };
 
 const structuredLlm = {
-  send: jest.fn().mockImplementation((message: string) => {
+  send: jest.fn().mockImplementation((_message: unknown) => {
     // Return a structured weather forecast
     const forecast: WeatherForecast = {
       location: 'New York, USA',
@@ -97,7 +103,7 @@ const structuredLlm = {
 
     return Promise.resolve(JSON.stringify(forecast));
   }),
-  structured: jest.fn().mockImplementation((messages: any[], model: any) => {
+  structured: jest.fn().mockImplementation((_messages: unknown[], _model: unknown) => {
     // Return a structured weather forecast
     const forecast: WeatherForecast = {
       location: 'New York, USA',
@@ -470,9 +476,7 @@ describe('FastAgent E2E Smoke Tests', () => {
           expect(fs.existsSync('weather_location.txt')).toBe(false);
 
           // Test tool call
-          const response = await agent.send(
-            Prompt.user('what is the weather in london')
-          );
+          const response = await agent.send('what is the weather in london');
 
           // Verify response contains expected content
           expect(response.toLowerCase()).toContain('sunny');
@@ -505,9 +509,7 @@ describe('FastAgent E2E Smoke Tests', () => {
         },
         async (agent: BaseAgent) => {
           // Test tool call with no arguments
-          const response = await agent.send(
-            Prompt.user('get the shirt colour')
-          );
+          const response = await agent.send('get the shirt colour');
 
           // Verify response contains expected content
           expect(response.toLowerCase()).toContain('blue');
