@@ -15,6 +15,11 @@ interface FormattedResponse {
   message: string;
 }
 
+// Runtime placeholder so we can pass a value where a runtime validator might be expected
+// while keeping the compile-time type information separate.
+// Using an empty object is sufficient for tests because the structured() method is mocked.
+const FormattedResponse: unknown = {};
+
 // Define the response format for JSON schema
 const responseFormat = {
   type: 'json_schema',
