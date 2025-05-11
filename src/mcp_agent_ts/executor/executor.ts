@@ -1,6 +1,7 @@
 // Executor functionality for MCP Agent in TypeScript
 
-// This file provides executor capabilities similar to those in the Python executor directory
+// Provides a thin asynchronous execution layer; by default just runs workflows
+// locally. Can be swapped in the future for Temporal or Workers.
 
 import { TaskRegistry, createTaskRegistry } from './taskRegistry';
 
@@ -17,7 +18,9 @@ export class DefaultExecutor implements Executor {
   }
 
   async executeWorkflow(workflow: any, ...args: any[]): Promise<any> {
-    // TODO: Implement workflow execution logic
+    if (typeof workflow?.run !== 'function') {
+      throw new Error('Provided workflow does not implement a run() method');
+    }
     return workflow.run(...args);
   }
 
@@ -30,8 +33,8 @@ export class DefaultExecutor implements Executor {
   }
 }
 
-export function createExecutor(type: string = 'default'): Executor {
-  // TODO: Implement factory for different executor types (e.g., Temporal)
-  const taskRegistry = createTaskRegistry(); // Create a task registry instance
-  return new DefaultExecutor(taskRegistry);
+export function createExecutor(type: string = 'default', taskRegistry?: TaskRegistry): Executor {
+  // Future: switch on `type` to return TemporalExecutor etc.
+  const registry = taskRegistry ?? createTaskRegistry();
+  return new DefaultExecutor(registry);
 }

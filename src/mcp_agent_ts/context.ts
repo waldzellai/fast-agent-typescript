@@ -2,7 +2,7 @@
 
 // This file provides context capabilities similar to those in the Python context.py
 
-import { Settings } from './config';
+import { Settings, loadSettings } from './config';
 import { HumanInputCallback, ServerSession } from './app';
 import { Executor, createExecutor } from './executor/executor';
 import { TaskRegistry, createTaskRegistry } from './executor/taskRegistry';
@@ -17,23 +17,34 @@ export class Context {
 
   constructor(config: Settings = {} as Settings) {
     this.config = config;
-    this.executor = createExecutor();
+    // Create a shared task registry so workflows and executor use the same
+    // registry instance.
     this.taskRegistry = createTaskRegistry();
-    // TODO: Initialize serverRegistry and other properties as needed
+    this.executor = createExecutor('default', this.taskRegistry);
+    // For now serverRegistry is a plain object map, can be replaced later.
+    this.serverRegistry = {};
   }
 
   async initialize(): Promise<void> {
-    // TODO: Implement initialization logic for context
+    // Placeholder async preparation; hook for future DB/Telemetry init.
+    return Promise.resolve();
   }
 
   async cleanup(): Promise<void> {
-    // TODO: Implement cleanup logic for context
+    // Future: close DB connections etc.
+    this.serverRegistry = null;
   }
 }
 
 export async function initializeContext(configOrPath: Settings | string | null = null): Promise<Context> {
-  // TODO: Implement logic to load settings if configOrPath is a string (path to config file)
-  const settings = configOrPath && typeof configOrPath !== 'string' ? configOrPath : {} as Settings;
+  let settings: Settings;
+  if (configOrPath === null) {
+    settings = loadSettings();
+  } else if (typeof configOrPath === 'string') {
+    settings = loadSettings(configOrPath);
+  } else {
+    settings = configOrPath;
+  }
   const context = new Context(settings);
   await context.initialize();
   return context;
