@@ -134,6 +134,10 @@ export interface BaseRequestParams {
   prompt_config?: PromptConfig;
 }
 
+// Backward-compatibility alias – older examples import RequestParams from this module.
+// We simply alias it to BaseRequestParams so those imports remain valid.
+export type RequestParams = BaseRequestParams;
+
 /**
  * Interface for content-based request parameters
  */
