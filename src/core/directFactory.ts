@@ -226,8 +226,100 @@ export async function createAgentsInDependencyOrder(
       Object.assign(activeAgents, basicAgents);
     }
 
-    // Add other agent types similarly (PARALLEL, ROUTER, CHAIN, EVALUATOR_OPTIMIZER, ORCHESTRATOR)
-    // Due to length constraints, full implementation for all types is not shown here
+    // PARALLEL agents
+    const parallelAgentsDict = Object.fromEntries(
+      Object.entries(agentsDict).filter(
+        ([name]) =>
+          group.includes(name) &&
+          agentsDict[name]["type"] === AgentType.PARALLEL,
+      ),
+    ) as AgentsDict;
+    if (Object.keys(parallelAgentsDict).length > 0) {
+      const parallelAgents = await createAgentsByType(
+        appInstance,
+        parallelAgentsDict,
+        AgentType.PARALLEL,
+        activeAgents,
+        modelFactoryFunc,
+      );
+      Object.assign(activeAgents, parallelAgents);
+    }
+
+    // ROUTER agents
+    const routerAgentsDict = Object.fromEntries(
+      Object.entries(agentsDict).filter(
+        ([name]) =>
+          group.includes(name) &&
+          agentsDict[name]["type"] === AgentType.ROUTER,
+      ),
+    ) as AgentsDict;
+    if (Object.keys(routerAgentsDict).length > 0) {
+      const routerAgents = await createAgentsByType(
+        appInstance,
+        routerAgentsDict,
+        AgentType.ROUTER,
+        activeAgents,
+        modelFactoryFunc,
+      );
+      Object.assign(activeAgents, routerAgents);
+    }
+
+    // CHAIN agents
+    const chainAgentsDict = Object.fromEntries(
+      Object.entries(agentsDict).filter(
+        ([name]) =>
+          group.includes(name) &&
+          agentsDict[name]["type"] === AgentType.CHAIN,
+      ),
+    ) as AgentsDict;
+    if (Object.keys(chainAgentsDict).length > 0) {
+      const chainAgents = await createAgentsByType(
+        appInstance,
+        chainAgentsDict,
+        AgentType.CHAIN,
+        activeAgents,
+        modelFactoryFunc,
+      );
+      Object.assign(activeAgents, chainAgents);
+    }
+
+    // EVALUATOR_OPTIMIZER agents
+    const evalOptAgentsDict = Object.fromEntries(
+      Object.entries(agentsDict).filter(
+        ([name]) =>
+          group.includes(name) &&
+          agentsDict[name]["type"] === AgentType.EVALUATOR_OPTIMIZER,
+      ),
+    ) as AgentsDict;
+    if (Object.keys(evalOptAgentsDict).length > 0) {
+      const evalOptAgents = await createAgentsByType(
+        appInstance,
+        evalOptAgentsDict,
+        AgentType.EVALUATOR_OPTIMIZER,
+        activeAgents,
+        modelFactoryFunc,
+      );
+      Object.assign(activeAgents, evalOptAgents);
+    }
+
+    // ORCHESTRATOR agents
+    const orchestratorAgentsDict = Object.fromEntries(
+      Object.entries(agentsDict).filter(
+        ([name]) =>
+          group.includes(name) &&
+          agentsDict[name]["type"] === AgentType.ORCHESTRATOR,
+      ),
+    ) as AgentsDict;
+    if (Object.keys(orchestratorAgentsDict).length > 0) {
+      const orchestratorAgents = await createAgentsByType(
+        appInstance,
+        orchestratorAgentsDict,
+        AgentType.ORCHESTRATOR,
+        activeAgents,
+        modelFactoryFunc,
+      );
+      Object.assign(activeAgents, orchestratorAgents);
+    }
   }
 
   return activeAgents;
