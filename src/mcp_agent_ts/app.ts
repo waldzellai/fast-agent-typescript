@@ -104,12 +104,13 @@ export class MCPApp {
     if (this.upstreamSession) {
       this.context.upstreamSession = this.upstreamSession;
     }
-    // TODO: Set signalNotification if applicable
     this.initialized = true;
   }
 
   async cleanup(): Promise<void> {
-    // TODO: Implement cleanup logic
+    if (this.context) {
+      await this.context.cleanup();
+    }
     this.initialized = false;
     this.context = null;
   }
@@ -120,15 +121,16 @@ export class MCPApp {
   }
 
   workflow(cls: any, workflowId: string | null = null, ...args: any[]): any {
-    // TODO: Implement workflow decorator logic
-    cls.app = this;
+    // Acts like @app.workflow decorator. Registers workflow class for later use.
     const id = workflowId || cls.name;
-    this.workflows.set(id, cls);
+    this.workflows.set(id, { cls, args });
+    cls.app = this;
     return cls;
   }
 
   workflowRun(fn: (...args: any[]) => any): (...args: any[]) => any {
-    // TODO: Implement workflow run decorator logic
+    // Marks a free function as a workflow ‘run’ entrypoint.
+    Reflect.set(fn, 'isWorkflowRun', true);
     return fn;
   }
 
@@ -139,7 +141,11 @@ export class MCPApp {
     ...kwargs: any[]
   ): (fn: (...args: any[]) => Promise<any>) => (...args: any[]) => Promise<any> {
     return (fn: (...args: any[]) => Promise<any>) => {
-      // TODO: Implement workflow task decorator logic
+      Reflect.set(fn, 'isWorkflowTask', true);
+      if (name) Reflect.set(fn, 'taskName', name);
+      if (scheduleToCloseTimeout)
+        Reflect.set(fn, 'scheduleToCloseTimeout', scheduleToCloseTimeout);
+      if (retryPolicy) Reflect.set(fn, 'retryPolicy', retryPolicy);
       return fn;
     };
   }

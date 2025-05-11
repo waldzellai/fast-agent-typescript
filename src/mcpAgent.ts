@@ -6,12 +6,18 @@
  */
 
 import { AgentConfig, AgentType } from './core/agentTypes';
+import { PromptMessageMultipart } from './core/prompt';
 
 // Placeholder types and interfaces for missing imports
 export interface BaseAgent {
   name: string;
   agentType: AgentType;
-  send(message: string): Promise<string>;
+  send(message: string | PromptMessageMultipart | PromptMessageMultipart[]): Promise<string>;
+  /**
+   * Backward compatibility: some code/tests use `generate` instead of `send`.
+   * We keep it optional so newer codebases can rely solely on `send`.
+   */
+  generate?(message: string | PromptMessageMultipart | PromptMessageMultipart[]): Promise<string>;
   applyPrompt(promptName: string, args: any): Promise<string>;
   listPrompts(): Promise<string[]>;
   prompt(defaultPrompt?: string, agentName?: string): Promise<string>;
@@ -416,7 +422,9 @@ export class Agent implements BaseAgent {
    * @param message The message to send
    * @returns The agent's response
    */
-  async send(message: string): Promise<string> {
+  async send(
+    message: string | PromptMessageMultipart | PromptMessageMultipart[]
+  ): Promise<string> {
     if (!this._llm) {
       throw new Error(
         `Agent ${this.name} has no LLM attached. Call attachLlm() first.`
@@ -424,18 +432,37 @@ export class Agent implements BaseAgent {
     }
 
     try {
+      // Normalize message to a string for downstream LLMs
+      let normalizedMessage: string;
+      if (typeof message === 'string') {
+        normalizedMessage = message;
+      } else {
+        // Basic conversion for now – callers can pass richer structures but they are JSON stringified here.
+        normalizedMessage = JSON.stringify(message);
+      }
+
       // If human input is enabled and callback is provided, use it
       if (this._config.human_input && this._humanInputCallback) {
-        const humanResponse = await this._humanInputCallback(message);
+        const humanResponse = await this._humanInputCallback(normalizedMessage);
         return humanResponse;
       }
 
       // Otherwise, use the LLM
-      return await this._llm.send(message);
+      return await this._llm.send(normalizedMessage);
     } catch (error) {
       console.error(`Error sending message to agent ${this.name}:`, error);
       return `Error: ${error instanceof Error ? error.message : String(error)}`;
     }
+  }
+
+  /**
+   * Alias method to support legacy `generate` calls
+   */
+  async generate(
+    message: string | PromptMessageMultipart | PromptMessageMultipart[],
+  ): Promise<string> {
+    // Simply forward to send()
+    return await this.send(message as any);
   }
 
   /**

@@ -1,6 +1,8 @@
 // Logger functionality for MCP Agent in TypeScript
 
-// This file provides logging capabilities similar to those in the Python logging directory
+// Lightweight logger wrapper using `consola` to provide consistent structured logs
+
+import consola from 'consola';
 
 export interface Logger {
   debug(message: string, ...args: any[]): void;
@@ -9,12 +11,17 @@ export interface Logger {
   error(message: string, ...args: any[]): void;
 }
 
+/**
+ * Obtain a namespaced logger instance.
+ * Internally uses `consola` but exposes a minimal interface so we can easily
+ * swap the underlying implementation in the future without touching callers.
+ */
 export function getLogger(name: string): Logger {
-  // TODO: Implement a proper logging library integration (e.g., winston or bunyan)
+  const logger = consola.withTag(name);
   return {
-    debug: (message: string, ...args: any[]) => console.debug(`[${name}] DEBUG: ${message}`, ...args),
-    info: (message: string, ...args: any[]) => console.info(`[${name}] INFO: ${message}`, ...args),
-    warn: (message: string, ...args: any[]) => console.warn(`[${name}] WARN: ${message}`, ...args),
-    error: (message: string, ...args: any[]) => console.error(`[${name}] ERROR: ${message}`, ...args),
-  };
+    debug: logger.debug.bind(logger),
+    info: logger.info.bind(logger),
+    warn: logger.warn.bind(logger),
+    error: logger.error.bind(logger)
+  } as Logger;
 }

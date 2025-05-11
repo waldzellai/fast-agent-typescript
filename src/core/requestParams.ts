@@ -134,6 +134,21 @@ export interface BaseRequestParams {
   prompt_config?: PromptConfig;
 }
 
+// Back-compatibility: Provide a **runtime** class so callers can use `new RequestParams()`
+// while still retaining the shape of `BaseRequestParams`. It accepts a partial object and
+// copies the supplied fields onto `this`.
+export class RequestParams implements BaseRequestParams {
+  request_id?: string;
+  agent_config?: AgentConfig;
+  prompt_config?: PromptConfig;
+  // Allow any extra properties (e.g. response_format) so tests/examples can extend freely.
+  [key: string]: any;
+
+  constructor(params: Partial<BaseRequestParams & Record<string, any>> = {}) {
+    Object.assign(this, params);
+  }
+}
+
 /**
  * Interface for content-based request parameters
  */
