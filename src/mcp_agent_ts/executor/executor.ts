@@ -33,8 +33,11 @@ export class DefaultExecutor implements Executor {
   }
 }
 
-export function createExecutor(type: string = 'default', taskRegistry?: TaskRegistry): Executor {
-  // Future: switch on `type` to return TemporalExecutor etc.
+export function createExecutor(
+  type: string = 'default',
+  taskRegistry?: TaskRegistry
+): Executor {
+  // Future: switch on `type` to return etc.
   const registry = taskRegistry ?? createTaskRegistry();
   return new DefaultExecutor(registry);
 }
