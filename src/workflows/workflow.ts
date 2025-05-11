@@ -1,7 +1,7 @@
 /**
  * Base interface for all workflow types
  */
-import { Agent, BaseAgent } from '../mcpAgent';
+import { Agent, BaseAgent, getLogger } from '../mcpAgent';
 import { AgentConfig, AgentType } from '../core/agentTypes';
 
 export interface Workflow extends BaseAgent {
@@ -46,6 +46,8 @@ export abstract class BaseWorkflow implements Workflow {
   agentType: AgentType;
   config: AgentConfig;
   protected agents: Record<string, BaseAgent> = {};
+  private _initialized = false; // Tracks whether initialize() has run
+  protected logger = getLogger(this.constructor.name);
 
   constructor(
     name: string,
@@ -63,11 +65,33 @@ export abstract class BaseWorkflow implements Workflow {
   abstract execute(input: string): Promise<string>;
 
   /**
+   * Ensures the workflow is initialized exactly once, then executes it.
+   * Subclasses generally call this via send() or directly.
+   */
+  async run(input: string): Promise<string> {
+    if (!this._initialized) {
+      this.logger?.info?.(`Initializing workflow ${this.name}`);
+      await this.initialize();
+      this._initialized = true;
+      this.logger?.info?.(`Initialization complete for workflow ${this.name}`);
+    }
+
+    try {
+      const result = await this.execute(input);
+      this.logger?.info?.(`Workflow ${this.name} completed execution.`);
+      return result;
+    } catch (error) {
+      this.logger?.error?.(`Error in workflow ${this.name}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
    * Send a message to the workflow
    * @param message The message to send
    */
   async send(message: string): Promise<string> {
-    return this.execute(message);
+    return this.run(message);
   }
 
   /**
