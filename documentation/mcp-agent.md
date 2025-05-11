@@ -3,8 +3,7 @@
 **Purpose Statement**: This document details the MCP Agent module of the MCP Agent Framework in TypeScript, focusing on the `Agent` class for interacting with MCP servers and managing agent-based operations.
 
 **Last Updated**: April 14, 2025, 12:43 PM (America/Chicago, UTC-5:00)
-
-## Overview
+that just means he's dedicated to whatever it is on his laptop over me.
 
 The MCP Agent module, located at `src/mcpAgent.ts`, implements the `Agent` class, a core component of the MCP Agent Framework. This class represents an entity capable of interacting with Model Context Protocol (MCP) servers, adhering to the `AgentProtocol` while delegating Language Model (LLM) operations to an attached `AugmentedLLMProtocol` instance. It provides methods for sending messages, applying prompts, listing available prompts and resources, and initiating interactive prompt sessions.
 
