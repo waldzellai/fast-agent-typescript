@@ -7,6 +7,8 @@
 import { BaseAgent } from '../mcpAgent';
 import { AgentConfig, AgentType } from '../core/agentTypes';
 import { BaseWorkflow } from './workflow';
+import { PromptMessageMultipart } from '../core/prompt';
+import { messageToString } from '../utils';
 
 export interface ChainConfig extends AgentConfig {
   /**
@@ -58,8 +60,12 @@ export class Chain extends BaseWorkflow {
    * @param input The input to the chain
    * @returns The output of the last agent in the chain
    */
-  async execute(input: string): Promise<string> {
-    let currentInput = input;
+  async execute(
+    input: string | PromptMessageMultipart | PromptMessageMultipart[],
+  ): Promise<string> {
+    const normalize = (m: any) =>
+      Array.isArray(m) ? m.map(messageToString).join('\n') : messageToString(m);
+    let currentInput = normalize(input);
     let result = '';
     
     for (const agentName of this.sequence) {
@@ -69,18 +75,18 @@ export class Chain extends BaseWorkflow {
       }
       
       // Send the current input to the agent
-      result = await agent.send(currentInput);
+      const agentResult = await agent.send(currentInput);
+      result = messageToString(agentResult);
       
       // Update the input for the next agent
       if (this.cumulative) {
         // If cumulative, include the original input and all previous outputs
-        currentInput = `${input}\n\nPrevious step output:\n${result}`;
+        currentInput = `${normalize(input)}\n\nPrevious step output:\n${result}`;
       } else {
-        // Otherwise, just use the output of the current agent
         currentInput = result;
       }
     }
-    
+
     return result;
   }
   

@@ -8,6 +8,8 @@ import {
   setupQuickstartCommand,
   setupBootstrapCommand,
 } from "./cli/quickstart";
+import { checkConfigCommand } from "./cli/check-config";
+
 
 // Application class to manage shared context
 class Application {
@@ -47,10 +49,19 @@ function showWelcome(): void {
     "-------------|------------------------------------------------------------",
   );
   console.log(
+    "go           | Start an interactive agent session",
+  );
+  console.log(
+    "-------------|------------------------------------------------------------",
+  );
+  console.log(
     "setup        | Set up a new agent project with configuration files",
   );
   console.log(
     "quickstart   | Create example applications (workflow, researcher, etc.)",
+  );
+  console.log(
+    "check-config | Validate configuration and secrets files",
   );
   console.log(
     "-------------|------------------------------------------------------------",
@@ -91,12 +102,14 @@ program
 
 // Add subcommands
 program.addCommand(setupCommand);
+program.addCommand(checkConfigCommand);
 
 // Placeholder for other subcommands
 
 // Setup quickstart and bootstrap commands
 setupQuickstartCommand(program);
 setupBootstrapCommand(program);
+setupGoCommand(program);
 
 // Handle case when no command is provided
 program.action(() => {

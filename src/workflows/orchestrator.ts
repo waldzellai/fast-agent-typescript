@@ -5,9 +5,50 @@
  * multiple agents. The orchestrator decides which agent to call at each step and
  * what to do with the results.
  */
-import { Agent, BaseAgent, AugmentedLLMProtocol } from '../mcpAgent';
+import { Agent, BaseAgent } from '../mcpAgent';
 import { AgentConfig, AgentType } from '../core/agentTypes';
 import { BaseWorkflow } from './workflow';
+import { getModelFactory } from '../core/directFactory';
+import { messageToString } from '../utils';
+
+export interface AgentTask {
+  description: string;
+  agent: string;
+  result?: string;
+}
+
+export interface Step {
+  description: string;
+  tasks: AgentTask[];
+}
+
+export interface Plan {
+  steps: Step[];
+  is_complete: boolean;
+}
+
+export interface NextStep {
+  description: string;
+  tasks: AgentTask[];
+  is_complete: boolean;
+}
+
+export interface TaskResult {
+  agent: string;
+  description: string;
+  result: string;
+}
+
+export interface StepResult {
+  description: string;
+  task_results: TaskResult[];
+}
+
+export interface PlanResult {
+  step_results: StepResult[];
+  is_complete: boolean;
+  max_iterations_reached?: boolean;
+}
 
 export interface OrchestratorConfig extends AgentConfig {
   /**
@@ -19,12 +60,19 @@ export interface OrchestratorConfig extends AgentConfig {
    * Maximum number of steps the orchestrator can take
    */
   max_steps?: number;
+
+  /**
+   * Planning mode: 'full' for upfront plan or 'iterative' for step-by-step
+   */
+  plan_type?: 'full' | 'iterative';
 }
 
 export class Orchestrator extends BaseWorkflow {
   private orchestratorAgents: string[] = [];
   private maxSteps: number = 10; // Default to 10 steps
   private orchestratorLLM?: Agent;
+  private planType: 'full' | 'iterative' = 'full';
+  planResult: PlanResult | null = null;
   
   constructor(config: OrchestratorConfig, agents: Record<string, BaseAgent>) {
     super(
@@ -36,6 +84,7 @@ export class Orchestrator extends BaseWorkflow {
     
     this.orchestratorAgents = config.orchestrator_agents || [];
     this.maxSteps = config.max_steps || 10;
+    this.planType = config.plan_type || 'full';
     
     // Validate that all agents in the orchestrator_agents exist
     for (const agentName of this.orchestratorAgents) {
@@ -59,57 +108,16 @@ export class Orchestrator extends BaseWorkflow {
       model: this.config.model,
       use_history: true // Orchestrator needs history to track the conversation
     });
-    
+
     // Initialize the orchestrator LLM
     await this.orchestratorLLM.initialize();
-    
-    // If the orchestrator has an attachLlm method, call it with a factory function
+    // Attach real LLM
     if ('attachLlm' in this.orchestratorLLM) {
-      await (this.orchestratorLLM as any).attachLlm(() => {
-        // This is a placeholder - in a real implementation, you would create an actual LLM
-        return {
-          send: async (message: string) => {
-            // Simple orchestration logic - in a real implementation, this would use an actual LLM
-            // to make more sophisticated orchestration decisions
-            
-            // Parse the message to extract the command
-            const lines = message.split('\n');
-            const commandLine = lines.find(line => line.startsWith('COMMAND:'));
-            
-            if (!commandLine) {
-              return 'FINISH: I need to make a decision. Please provide a command in the format COMMAND: agent_name or COMMAND: FINISH.';
-            }
-            
-            const command = commandLine.substring('COMMAND:'.length).trim();
-            
-            if (command === 'FINISH') {
-              return 'FINISH: Task completed successfully.';
-            }
-            
-            // Check if the command is a valid agent name
-            if (this.orchestratorAgents.includes(command)) {
-              // Extract the message for the agent
-              const messageLine = lines.find(line => line.startsWith('MESSAGE:'));
-              const agentMessage = messageLine ? messageLine.substring('MESSAGE:'.length).trim() : 'Please help with this task.';
-              
-              // Call the agent
-              try {
-                const agent = this.agents[command];
-                const result = await agent.send(agentMessage);
-                return `RESULT from ${command}:\n${result}\n\nWhat's the next step? Use COMMAND: agent_name or COMMAND: FINISH.`;
-              } catch (error) {
-                return `ERROR calling ${command}: ${error instanceof Error ? error.message : String(error)}\n\nWhat's the next step? Use COMMAND: agent_name or COMMAND: FINISH.`;
-              }
-            } else {
-              return `ERROR: Agent "${command}" not found. Available agents: ${this.orchestratorAgents.join(', ')}\n\nWhat's the next step? Use COMMAND: agent_name or COMMAND: FINISH.`;
-            }
-          },
-          applyPrompt: async () => "",
-          listPrompts: async () => [],
-          listResources: async () => [],
-          messageHistory: []
-        } as AugmentedLLMProtocol;
-      });
+      const factory = getModelFactory(
+        (this.orchestratorLLM as any).context || {},
+        this.config.model,
+      );
+      await (this.orchestratorLLM as any).attachLlm(factory as any);
     }
   }
   
@@ -122,26 +130,50 @@ Your job is to break down complex tasks into smaller steps, decide which agent s
 
 Available agents:
 `;
-    
-    // Add information about each agent
+
     for (const agentName of this.orchestratorAgents) {
       const agent = this.agents[agentName];
       const agentConfig = (agent as any).config as AgentConfig;
       instruction += `- ${agentName}: ${agentConfig.instruction || 'No description available'}\n`;
     }
-    
+
     instruction += `
-To use an agent, respond with:
-COMMAND: agent_name
-MESSAGE: your message to the agent
+When planning, respond with JSON. For a full plan respond with {"steps": [{"description": str, "tasks": [{"description": str, "agent": str}]}], "is_complete": bool}.
+For iterative planning respond with {"description": str, "tasks": [{"description": str, "agent": str}], "is_complete": bool}.`;
 
-When you've completed the task, respond with:
-COMMAND: FINISH
-MESSAGE: your final response
-
-You can take a maximum of ${this.maxSteps} steps to complete a task.`;
-    
     return instruction;
+  }
+
+  private async _get_full_plan(request: string): Promise<Plan> {
+    if (!this.orchestratorLLM) {
+      throw new Error('Orchestrator not initialized');
+    }
+    const resp = await this.orchestratorLLM.send(
+      `Create a complete plan for the following request. Respond with JSON.\n${request}`,
+    );
+    const text = messageToString(resp);
+    return JSON.parse(text);
+  }
+
+  private async _get_next_step(
+    request: string,
+    previousSteps: StepResult[],
+  ): Promise<NextStep> {
+    if (!this.orchestratorLLM) {
+      throw new Error('Orchestrator not initialized');
+    }
+    const summary = previousSteps
+      .map((s, i) => {
+        const tasks = s.task_results
+          .map((t) => `${t.agent}: ${t.result}`)
+          .join('; ');
+        return `Step ${i + 1} (${s.description}): ${tasks}`;
+      })
+      .join('\n');
+    const prompt = `Given the task: ${request}\nPrevious steps:\n${summary}\nProvide the next step as JSON.`;
+    const resp = await this.orchestratorLLM.send(prompt);
+    const text = messageToString(resp);
+    return JSON.parse(text);
   }
   
   /**
@@ -153,34 +185,77 @@ You can take a maximum of ${this.maxSteps} steps to complete a task.`;
     if (!this.orchestratorLLM) {
       throw new Error(`Orchestrator ${this.name} has not been initialized`);
     }
-    
-    // Start the orchestration process
-    let currentMessage = `I need your help with the following task:\n\n${input}\n\nWhat's the first step?`;
-    let steps = 0;
-    
-    while (steps < this.maxSteps) {
-      steps++;
-      
-      // Send the current message to the orchestrator
-      const response = await this.orchestratorLLM.send(currentMessage);
-      
-      // Check if the orchestrator is finished
-      if (response.includes('COMMAND: FINISH') || response.startsWith('FINISH:')) {
-        // Extract the final message
-        const finalMessage = response.includes('MESSAGE:') 
-          ? response.split('MESSAGE:')[1].trim()
-          : response.startsWith('FINISH:')
-            ? response.substring('FINISH:'.length).trim()
-            : response;
-        
-        return finalMessage;
+
+    this.planResult = { step_results: [], is_complete: false };
+
+    if (this.planType === 'full') {
+      const plan = await this._get_full_plan(input);
+      for (const step of plan.steps) {
+        const stepRes: StepResult = { description: step.description, task_results: [] };
+        for (const task of step.tasks) {
+          const agent = this.agents[task.agent];
+          if (!agent) {
+            stepRes.task_results.push({
+              agent: task.agent,
+              description: task.description,
+              result: `ERROR: Agent ${task.agent} not found`,
+            });
+            continue;
+          }
+          const result = await agent.send(task.description);
+          stepRes.task_results.push({
+            agent: task.agent,
+            description: task.description,
+            result: messageToString(result),
+          });
+        }
+        this.planResult.step_results.push(stepRes);
       }
-      
-      // Update the current message with the orchestrator's response
-      currentMessage = response;
+      this.planResult.is_complete = plan.is_complete;
+    } else {
+      let iterations = 0;
+      while (iterations < this.maxSteps) {
+        iterations++;
+        const next = await this._get_next_step(input, this.planResult.step_results);
+        const stepRes: StepResult = { description: next.description, task_results: [] };
+        for (const task of next.tasks) {
+          const agent = this.agents[task.agent];
+          if (!agent) {
+            stepRes.task_results.push({
+              agent: task.agent,
+              description: task.description,
+              result: `ERROR: Agent ${task.agent} not found`,
+            });
+            continue;
+          }
+          const result = await agent.send(task.description);
+          stepRes.task_results.push({
+            agent: task.agent,
+            description: task.description,
+            result: messageToString(result),
+          });
+        }
+        this.planResult.step_results.push(stepRes);
+        if (next.is_complete) {
+          this.planResult.is_complete = true;
+          break;
+        }
+      }
+      if (!this.planResult.is_complete) {
+        this.planResult.max_iterations_reached = true;
+      }
     }
-    
-    // If we've reached the maximum number of steps, return a timeout message
-    return `Orchestration timed out after ${this.maxSteps} steps. Last state: ${currentMessage}`;
+
+    const summary = this.planResult.step_results
+      .map(
+        (s, i) =>
+          `Step ${i + 1} (${s.description}): ` +
+          s.task_results.map((t) => `${t.agent}: ${t.result}`).join('; '),
+      )
+      .join('\n');
+    const finalResp = await this.orchestratorLLM.send(
+      `Task: ${input}\nResults:\n${summary}\nProvide final answer.`,
+    );
+    return messageToString(finalResp);
   }
 }

@@ -2,12 +2,11 @@
 
 // This file is a conversion of the Python app.py to TypeScript, maintaining original functionality.
 
+import { HumanInputCallback } from './humanInput/types';
+export type { HumanInputCallback } from './humanInput/types';
+
 export interface Settings {
   // Placeholder for configuration settings
-}
-
-export interface HumanInputCallback {
-  (prompt: string): Promise<string>;
 }
 
 export interface SignalWaitCallback {

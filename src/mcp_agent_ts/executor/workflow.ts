@@ -2,6 +2,14 @@
 
 // This file provides workflow capabilities similar to those in the Python executor/workflow.py
 import { Executor } from './executor';
+import {
+  ElicitationForm,
+  FormResponse,
+  HumanInputCallback,
+  HumanInputRequest,
+  HumanInputResponse,
+} from '../humanInput/types';
+import { consoleInputCallback } from '../humanInput/handler';
 
 /**
  * Represents an application-like object that provides an executor.
@@ -35,6 +43,23 @@ export abstract class BaseWorkflow implements Workflow {
     this.executor = app.executor;
     this.name = name || this.constructor.name;
     this.description = description;
+  }
+
+  private getHumanInputHandler(): HumanInputCallback {
+    const ctx = (this.app as any)?.getContext?.();
+    return ctx?.humanInputHandler ?? consoleInputCallback;
+  }
+
+  protected async humanInput(
+    prompt: HumanInputRequest
+  ): Promise<HumanInputResponse> {
+    const handler = this.getHumanInputHandler();
+    return handler(prompt);
+  }
+
+  protected async elicitForm(form: ElicitationForm): Promise<FormResponse> {
+    const result = await this.humanInput(form);
+    return typeof result === 'string' ? { value: result } : result;
   }
 
   /**

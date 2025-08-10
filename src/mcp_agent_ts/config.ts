@@ -28,16 +28,72 @@ function readFileIfExists(filePath: string): Record<string, any> | null {
 }
 
 /**
+ * Recursively walk from a starting directory up to the filesystem root,
+ * collecting configuration and secret files.  Files in deeper directories
+ * override ones found higher in the tree.
+ */
+function loadConfigTree(startDir: string): Record<string, any> {
+  const configNames = ['config.json', 'config.yaml', 'config.yml'];
+  const secretNames = ['secrets.json', 'secrets.yaml', 'secrets.yml'];
+
+  const dirs: string[] = [];
+  let dir = startDir;
+  while (true) {
+    dirs.unshift(dir); // root first
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  let combined: Record<string, any> = {};
+  for (const d of dirs) {
+    for (const name of configNames) {
+      const file = path.join(d, name);
+      const contents = readFileIfExists(file);
+      if (contents) {
+        combined = { ...combined, ...contents };
+        break; // only one config.* per directory
+      }
+    }
+    for (const name of secretNames) {
+      const file = path.join(d, name);
+      const contents = readFileIfExists(file);
+      if (contents) {
+        combined = { ...combined, ...contents };
+        break; // only one secrets.* per directory
+      }
+    }
+  }
+  return combined;
+}
+
+/**
  * Load Settings from a file if provided, otherwise fall back to environment
  * variables and sane defaults.
  */
 export function loadSettings(configPath?: string): Settings {
   let fileSettings: Record<string, any> = {};
+
+  // Determine starting directory and explicit file if provided
+  let explicitFile: string | null = null;
+  let startDir: string;
   if (configPath) {
     const resolved = path.resolve(configPath);
-    const contents = readFileIfExists(resolved);
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+      explicitFile = resolved;
+      startDir = path.dirname(resolved);
+    } else {
+      startDir = resolved;
+    }
+  } else {
+    startDir = process.cwd();
+  }
+
+  fileSettings = loadConfigTree(startDir);
+  if (explicitFile) {
+    const contents = readFileIfExists(explicitFile);
     if (contents) {
-      fileSettings = contents;
+      fileSettings = { ...fileSettings, ...contents };
     }
   }
 
