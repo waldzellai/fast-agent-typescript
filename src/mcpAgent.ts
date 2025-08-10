@@ -7,6 +7,8 @@
 
 import { AgentConfig, AgentType } from './core/agentTypes';
 import { PromptMessageMultipart } from './core/prompt';
+import { AugmentedLLMProtocol } from './llm';
+export { AugmentedLLMProtocol, PlaybackLLM, PassthroughLLM, SilentLLM } from './llm';
 
 // Placeholder types and interfaces for missing imports
 export interface BaseAgent {
@@ -325,14 +327,6 @@ export type HumanInputCallback = (input: string) => Promise<string>;
 export function getLogger(_name: string): any {
   // Placeholder for logger
   return console;
-}
-
-export interface AugmentedLLMProtocol {
-  send(message: string, options?: any): Promise<string>;
-  applyPrompt(promptName: string, args: any): Promise<string>;
-  listPrompts(): Promise<string[]>;
-  listResources(): Promise<string[]>;
-  messageHistory: any[];
 }
 
 export interface Context {

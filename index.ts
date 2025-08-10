@@ -30,7 +30,14 @@ import {
   getArgumentInput,
 } from './src/core/enhancedPrompt';
 import { BaseRequestParams } from './src/core/requestParams';
-import { Agent, BaseAgent } from './src/mcpAgent';
+import {
+  Agent,
+  BaseAgent,
+  AugmentedLLMProtocol,
+  PlaybackLLM,
+  PassthroughLLM,
+  SilentLLM,
+} from './src/mcpAgent';
 import { FastAgent } from './src/fastAgent';
 import {
   Workflow,
@@ -52,6 +59,10 @@ export {
   FastAgent,
   Agent,
   BaseAgent,
+  AugmentedLLMProtocol,
+  PlaybackLLM,
+  PassthroughLLM,
+  SilentLLM,
 
   // Types and Interfaces
   AgentType,
