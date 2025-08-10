@@ -3,7 +3,8 @@
 // This file provides context capabilities similar to those in the Python context.py
 
 import { Settings, loadSettings } from './config';
-import { HumanInputCallback, ServerSession } from './app';
+import { ServerSession } from './app';
+import { HumanInputCallback } from './humanInput/types';
 import { Executor, createExecutor } from './executor/executor';
 import { TaskRegistry, createTaskRegistry } from './executor/taskRegistry';
 
