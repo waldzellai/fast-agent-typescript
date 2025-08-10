@@ -4,9 +4,12 @@
  * A Parallel workflow executes multiple agents in parallel, then optionally
  * aggregates their results using a fan-in agent.
  */
-import { Agent, BaseAgent, AugmentedLLMProtocol } from '../mcpAgent';
+import { Agent, BaseAgent } from '../mcpAgent';
 import { AgentConfig, AgentType } from '../core/agentTypes';
 import { BaseWorkflow } from './workflow';
+import { getModelFactory } from '../core/directFactory';
+import { PromptMessageMultipart } from '../core/prompt';
+import { messageToString } from '../utils';
 
 export interface ParallelConfig extends AgentConfig {
   /**
@@ -70,31 +73,22 @@ export class Parallel extends BaseWorkflow {
       const defaultFanInName = `${this.name}_default_fan_in`;
       this.defaultFanInAgent = new Agent({
         name: defaultFanInName,
-        instruction: "You are a passthrough agent that combines outputs from parallel agents.",
+        instruction:
+          'You are a passthrough agent that combines outputs from parallel agents.',
         agent_type: AgentType.BASIC,
-        use_history: false
+        model: this.config.model,
+        use_history: false,
       });
-      
-      // Initialize the default fan-in agent
+
       await this.defaultFanInAgent.initialize();
-      
-      // If the agent has an attachLlm method, call it with a factory function
       if ('attachLlm' in this.defaultFanInAgent) {
-        await (this.defaultFanInAgent as any).attachLlm(() => {
-          // This is a placeholder - in a real implementation, you would create an actual LLM
-          return {
-            send: async (message: string) => {
-              // Simple passthrough logic - just return the message
-              return message;
-            },
-            applyPrompt: async () => "",
-            listPrompts: async () => [],
-            listResources: async () => [],
-            messageHistory: []
-          } as AugmentedLLMProtocol;
-        });
+        const factory = getModelFactory(
+          (this.defaultFanInAgent as any).context || {},
+          this.config.model || undefined,
+        );
+        await (this.defaultFanInAgent as any).attachLlm(factory as any);
       }
-      
+
       this.agents[defaultFanInName] = this.defaultFanInAgent;
       this.fanIn = defaultFanInName;
     }
@@ -105,29 +99,43 @@ export class Parallel extends BaseWorkflow {
    * @param input The input to the workflow
    * @returns The aggregated output of the fan-out agents
    */
-  async execute(input: string): Promise<string> {
-    // Execute all fan-out agents in parallel
+  async execute(
+    input: string | PromptMessageMultipart | PromptMessageMultipart[],
+  ): Promise<string> {
+    const normalize = (m: any) =>
+      Array.isArray(m) ? m.map(messageToString).join('\n') : messageToString(m);
+    const normalizedInput = normalize(input);
+
     const fanOutPromises = this.fanOut.map(async (agentName) => {
       const agent = this.agents[agentName];
       if (!agent) {
         throw new Error(`Agent ${agentName} not found in parallel workflow ${this.name}`);
       }
-      
+
       try {
-        const result = await agent.send(input);
-        return { agentName, result };
+        const result = await agent.send(normalizedInput);
+        return { agentName, result: messageToString(result) };
       } catch (error) {
-        console.error(`Error executing agent ${agentName} in parallel workflow ${this.name}:`, error);
-        return { agentName, result: `Error: ${error instanceof Error ? error.message : String(error)}` };
+        console.error(
+          `Error executing agent ${agentName} in parallel workflow ${this.name}:`,
+          error,
+        );
+        return {
+          agentName,
+          result: `Error: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        };
       }
     });
-    
-    // Wait for all fan-out agents to complete
+
     const fanOutResults = await Promise.all(fanOutPromises);
     
     // If there's no fan-in agent, return the results as-is
     if (!this.fanIn) {
-      return fanOutResults.map(({ agentName, result }) => `${agentName}:\n${result}`).join('\n\n');
+      return fanOutResults
+        .map(({ agentName, result }) => `${agentName}:\n${result}`)
+        .join('\n\n');
     }
     
     // Otherwise, use the fan-in agent to aggregate the results
@@ -140,7 +148,7 @@ export class Parallel extends BaseWorkflow {
     let fanInMessage = '';
     
     if (this.includeRequest) {
-      fanInMessage += `Original request: ${input}\n\n`;
+      fanInMessage += `Original request: ${normalizedInput}\n\n`;
     }
     
     fanInMessage += 'Agent results:\n\n';
@@ -148,8 +156,8 @@ export class Parallel extends BaseWorkflow {
     for (const { agentName, result } of fanOutResults) {
       fanInMessage += `${agentName}:\n${result}\n\n`;
     }
-    
-    // Send the fan-in message to the fan-in agent
-    return fanInAgent.send(fanInMessage);
+
+    const fanInResult = await fanInAgent.send(fanInMessage);
+    return messageToString(fanInResult);
   }
 }

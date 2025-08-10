@@ -4,9 +4,11 @@
  * A Router workflow uses an LLM to determine which agent should handle a given input,
  * then routes the input to that agent.
  */
-import { Agent, BaseAgent, AugmentedLLMProtocol } from '../mcpAgent';
+import { Agent, BaseAgent } from '../mcpAgent';
 import { AgentConfig, AgentType } from '../core/agentTypes';
 import { BaseWorkflow } from './workflow';
+import { getModelFactory } from '../core/directFactory';
+import { messageToString } from '../utils';
 
 export interface RouterConfig extends AgentConfig {
   /**
@@ -51,38 +53,16 @@ export class Router extends BaseWorkflow {
       model: this.config.model,
       use_history: false // Router doesn't need history
     });
-    
+
     // Initialize the router LLM
     await this.routerLLM.initialize();
-    
-    // If the router has an attachLlm method, call it with a factory function
+    // Attach real LLM using model factory
     if ('attachLlm' in this.routerLLM) {
-      await (this.routerLLM as any).attachLlm(() => {
-        // This is a placeholder - in a real implementation, you would create an actual LLM
-        return {
-          send: async (message: string) => {
-            // Simple routing logic - in a real implementation, this would use an actual LLM
-            // to make a more sophisticated routing decision
-            const lowerMessage = message.toLowerCase();
-            
-            // For each agent, check if its name or a keyword related to its instruction
-            // appears in the message
-            for (const agentName of this.routerAgents) {
-              const agent = this.agents[agentName];
-              if (lowerMessage.includes(agentName.toLowerCase())) {
-                return agentName;
-              }
-            }
-            
-            // Default to the first agent if no match is found
-            return this.routerAgents[0];
-          },
-          applyPrompt: async () => "",
-          listPrompts: async () => [],
-          listResources: async () => [],
-          messageHistory: []
-        } as AugmentedLLMProtocol;
-      });
+      const factory = getModelFactory(
+        (this.routerLLM as any).context || {},
+        this.config.model || undefined,
+      );
+      await (this.routerLLM as any).attachLlm(factory as any);
     }
   }
   
@@ -117,18 +97,26 @@ Respond ONLY with the name of the selected agent. Do not include any other text 
     if (!this.routerLLM) {
       throw new Error(`Router ${this.name} has not been initialized`);
     }
-    
-    // Ask the router LLM which agent should handle this input
-    const selectedAgentName = (await this.routerLLM.send(input)).trim();
-    
-    // Check if the selected agent exists
-    if (!this.agents[selectedAgentName]) {
-      console.warn(`Router selected non-existent agent: ${selectedAgentName}. Falling back to first agent.`);
-      const fallbackAgentName = this.routerAgents[0];
-      return this.agents[fallbackAgentName].send(input);
+
+    const selectionRaw = await this.routerLLM.send(input);
+    const selectionText = messageToString(selectionRaw).trim();
+
+    let selectedAgentName = selectionText;
+    try {
+      const parsed = JSON.parse(selectionText);
+      if (parsed.agent) {
+        selectedAgentName = parsed.agent;
+      }
+    } catch {
+      // not JSON, keep as is
     }
-    
-    // Route the input to the selected agent
-    return this.agents[selectedAgentName].send(input);
+
+    const targetAgent = this.agents[selectedAgentName];
+    if (!targetAgent) {
+      return `A response was received, but the agent ${selectedAgentName} was not known to the Router`;
+    }
+
+    const result = await targetAgent.send(input);
+    return messageToString(result);
   }
 }
