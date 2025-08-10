@@ -1,6 +1,7 @@
 // src/server.ts
 
 import { BaseAgent } from './mcpAgent';
+import { ToolDefinition, ToolSchema } from './tools/toolDefinition';
 
 import { FastMCP, type Context } from 'fastmcp';
 import { z } from 'zod';
@@ -43,6 +44,7 @@ export class AgentMCPServer {
     this.mcpServer.addTool({
       name: `${agentName}_send`,
       description: `Send a message to the ${agentName} agent`,
+
       parameters: z.object({ message: z.string() }),
       execute: async (args: { message: string }, ctx: Context<any>) => {
         const agentContext = (agent as any).context || null;
@@ -71,6 +73,21 @@ export class AgentMCPServer {
         return JSON.stringify(history);
       },
     });
+
+    if (agent.tools) {
+      for (const tool of agent.tools as ToolDefinition[]) {
+        const registeredTool = this.mcpServer.tool({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+          response: tool.response,
+        });
+
+        registeredTool(async (args: any, ctx: MCPContext) => {
+          return await tool.handler(args, ctx);
+        });
+      }
+    }
   }
 
   public run(
