@@ -10,6 +10,7 @@ import {
 } from "./cli/quickstart";
 import { checkConfigCommand } from "./cli/check-config";
 
+
 // Application class to manage shared context
 class Application {
   verbosity: number = 0;
@@ -44,6 +45,12 @@ function showWelcome(): void {
   console.log("\nAvailable Commands:");
   console.log("------------------");
   console.log("Command      | Description");
+  console.log(
+    "-------------|------------------------------------------------------------",
+  );
+  console.log(
+    "go           | Start an interactive agent session",
+  );
   console.log(
     "-------------|------------------------------------------------------------",
   );
@@ -102,6 +109,7 @@ program.addCommand(checkConfigCommand);
 // Setup quickstart and bootstrap commands
 setupQuickstartCommand(program);
 setupBootstrapCommand(program);
+setupGoCommand(program);
 
 // Handle case when no command is provided
 program.action(() => {
