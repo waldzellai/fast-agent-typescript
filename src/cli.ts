@@ -8,7 +8,8 @@ import {
   setupQuickstartCommand,
   setupBootstrapCommand,
 } from "./cli/quickstart";
-import { setupGoCommand } from "./cli/go";
+import { checkConfigCommand } from "./cli/check-config";
+
 
 // Application class to manage shared context
 class Application {
@@ -60,6 +61,9 @@ function showWelcome(): void {
     "quickstart   | Create example applications (workflow, researcher, etc.)",
   );
   console.log(
+    "check-config | Validate configuration and secrets files",
+  );
+  console.log(
     "-------------|------------------------------------------------------------",
   );
 
@@ -98,6 +102,7 @@ program
 
 // Add subcommands
 program.addCommand(setupCommand);
+program.addCommand(checkConfigCommand);
 
 // Placeholder for other subcommands
 
