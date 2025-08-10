@@ -3,6 +3,7 @@
 import { BaseAgent } from './mcpAgent';
 // Assuming FastMCP and MCPContext are part of an external library or need to be defined
 // For now, we'll define placeholder interfaces/types to represent them
+import { ConsoleProgressDisplay } from './logging/consoleProgressDisplay';
 export interface FastMCP {
   tool: (options: {
     name: string;
@@ -186,9 +187,21 @@ export class AgentMCPServer {
     func: Function,
     ...args: any[]
   ): Promise<any> {
-    let originalProgressReporter: Function | null = null;
+    let originalProgressReporter:
+      | ((progress: number, total?: number) => Promise<void>)
+      | null = null;
+
     if (agentContext.progress_reporter) {
       originalProgressReporter = agentContext.progress_reporter;
+    } else {
+      const display = new ConsoleProgressDisplay();
+      originalProgressReporter = async (
+        progress: number,
+        total?: number,
+      ): Promise<void> => {
+        display.report(progress, total);
+      };
+      agentContext.progress_reporter = originalProgressReporter;
     }
 
     agentContext.mcp_context = mcpContext;
@@ -202,16 +215,12 @@ export class AgentMCPServer {
       }
     };
 
-    if (agentContext.progress_reporter) {
-      agentContext.progress_reporter = bridgedProgress;
-    }
+    agentContext.progress_reporter = bridgedProgress;
 
     try {
       return await func(...args);
     } finally {
-      if (agentContext.progress_reporter) {
-        agentContext.progress_reporter = originalProgressReporter;
-      }
+      agentContext.progress_reporter = originalProgressReporter;
       if (agentContext.mcp_context) {
         delete agentContext.mcp_context;
       }
