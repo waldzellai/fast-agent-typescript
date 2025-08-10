@@ -7,19 +7,26 @@
 
 import { AgentConfig, AgentType } from './core/agentTypes';
 import { PromptMessageMultipart } from './core/prompt';
-import { AugmentedLLMProtocol } from './llm';
-export { AugmentedLLMProtocol, PlaybackLLM, PassthroughLLM, SilentLLM } from './llm';
+import {
+  getLogger as createLogger,
+  Logger,
+} from './mcp_agent_ts/logging/logger';
+
 
 // Placeholder types and interfaces for missing imports
 export interface BaseAgent {
   name: string;
   agentType: AgentType;
-  send(message: string | PromptMessageMultipart | PromptMessageMultipart[]): Promise<string>;
+  send(
+    message: string | PromptMessageMultipart | PromptMessageMultipart[]
+  ): Promise<string>;
   /**
    * Backward compatibility: some code/tests use `generate` instead of `send`.
    * We keep it optional so newer codebases can rely solely on `send`.
    */
-  generate?(message: string | PromptMessageMultipart | PromptMessageMultipart[]): Promise<string>;
+  generate?(
+    message: string | PromptMessageMultipart | PromptMessageMultipart[]
+  ): Promise<string>;
   applyPrompt(promptName: string, args: any): Promise<string>;
   listPrompts(): Promise<string[]>;
   prompt(defaultPrompt?: string, agentName?: string): Promise<string>;
@@ -324,10 +331,8 @@ export class InteractivePrompt {
 
 export type HumanInputCallback = (input: string) => Promise<string>;
 
-export function getLogger(_name: string): any {
-  // Placeholder for logger
-  return console;
-}
+// Re-export the structured logger for external modules
+export { createLogger as getLogger, Logger };
 
 export interface Context {
   config?: {
@@ -453,7 +458,7 @@ export class Agent implements BaseAgent {
    * Alias method to support legacy `generate` calls
    */
   async generate(
-    message: string | PromptMessageMultipart | PromptMessageMultipart[],
+    message: string | PromptMessageMultipart | PromptMessageMultipart[]
   ): Promise<string> {
     // Simply forward to send()
     return await this.send(message as any);
