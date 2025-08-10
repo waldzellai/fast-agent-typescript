@@ -12,6 +12,7 @@ import {
   Logger,
 } from './mcp_agent_ts/logging/logger';
 
+
 // Placeholder types and interfaces for missing imports
 export interface BaseAgent {
   name: string;
@@ -332,14 +333,6 @@ export type HumanInputCallback = (input: string) => Promise<string>;
 
 // Re-export the structured logger for external modules
 export { createLogger as getLogger, Logger };
-
-export interface AugmentedLLMProtocol {
-  send(message: string, options?: any): Promise<string>;
-  applyPrompt(promptName: string, args: any): Promise<string>;
-  listPrompts(): Promise<string[]>;
-  listResources(): Promise<string[]>;
-  messageHistory: any[];
-}
 
 export interface Context {
   config?: {
