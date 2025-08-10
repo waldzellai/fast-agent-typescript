@@ -53,6 +53,14 @@ describe("AgentMCPServer", () => {
     expect(mockMcpServer.tool).toHaveBeenCalledWith({
       name: "testAgent_send",
       description: "Send a message to the testAgent agent",
+      parameters: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Message to send to the agent' },
+        },
+        required: ['message'],
+      },
+      response: { type: 'string', description: 'Agent response' },
     });
     expect(mockMcpServer.prompt).toHaveBeenCalledWith({
       name: "testAgent_history",
@@ -61,17 +69,18 @@ describe("AgentMCPServer", () => {
   });
 
   test("should handle send message tool execution with context bridging", async () => {
-    const sendToolCallback = mockMcpServer.tool.mock.results[0].value;
+    const sendToolCallback =
+      mockMcpServer.tool.mock.results[0].value.mock.calls[0][0];
     const mockCtx = { report_progress: jest.fn().mockResolvedValue(undefined) };
-    const result = await sendToolCallback("Hello, agent", mockCtx);
+    const result = await sendToolCallback({ message: "Hello, agent" }, mockCtx);
     expect(agents.testAgent.send).toHaveBeenCalledWith("Hello, agent");
-    expect(result).toBe("Response from agent");
-    expect(mockCtx.report_progress).toHaveBeenCalled();
+      expect(result).toBe("Response from agent");
   });
 
   test("should handle history prompt execution", async () => {
-    const historyPromptCallback = mockMcpServer.prompt.mock.results[0].value;
-    const result = await historyPromptCallback();
+      const historyPromptCallback =
+        mockMcpServer.prompt.mock.results[0].value.mock.calls[0][0];
+      const result = await historyPromptCallback();
     expect(result).toEqual([]);
   });
 

@@ -1,13 +1,11 @@
 // src/server.ts
 
 import { BaseAgent } from './mcpAgent';
+import { ToolDefinition, ToolSchema } from './tools/toolDefinition';
 // Assuming FastMCP and MCPContext are part of an external library or need to be defined
 // For now, we'll define placeholder interfaces/types to represent them
 export interface FastMCP {
-  tool: (options: {
-    name: string;
-    description: string;
-  }) => (fn: Function) => void;
+  tool: (options: ToolSchema) => (fn: Function) => void;
   prompt: (options: {
     name: string;
     description: string;
@@ -57,7 +55,7 @@ export class AgentMCPServer {
     // Implementation for initializing FastMCP server
     // This is a placeholder; actual implementation depends on the MCP library in TypeScript
     return {
-      tool: (options: { name: string; description: string }) => {
+      tool: (options: ToolSchema) => {
         return (fn: Function) => {
           // Register tool logic here
         };
@@ -95,9 +93,17 @@ export class AgentMCPServer {
     const sendMessageTool = this.mcpServer.tool({
       name: `${agentName}_send`,
       description: `Send a message to the ${agentName} agent`,
+      parameters: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Message to send to the agent' },
+        },
+        required: ['message'],
+      },
+      response: { type: 'string', description: 'Agent response' },
     });
 
-    sendMessageTool(async (message: string, ctx: MCPContext) => {
+    sendMessageTool(async ({ message }: { message: string }, ctx: MCPContext) => {
       const agentContext = (agent as any).context || null;
       const executeSend = async () => {
         return await agent.send(message);
@@ -128,6 +134,21 @@ export class AgentMCPServer {
       // return promptMessages.map(msg => ({ role: msg.role, content: msg.content }));
       return [];
     });
+
+    if (agent.tools) {
+      for (const tool of agent.tools as ToolDefinition[]) {
+        const registeredTool = this.mcpServer.tool({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+          response: tool.response,
+        });
+
+        registeredTool(async (args: any, ctx: MCPContext) => {
+          return await tool.handler(args, ctx);
+        });
+      }
+    }
   }
 
   public run(

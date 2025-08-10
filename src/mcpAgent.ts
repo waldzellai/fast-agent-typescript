@@ -7,11 +7,13 @@
 
 import { AgentConfig, AgentType } from './core/agentTypes';
 import { PromptMessageMultipart } from './core/prompt';
+import { ToolDefinition } from './tools/toolDefinition';
 
 // Placeholder types and interfaces for missing imports
 export interface BaseAgent {
   name: string;
   agentType: AgentType;
+  tools?: ToolDefinition[];
   send(message: string | PromptMessageMultipart | PromptMessageMultipart[]): Promise<string>;
   /**
    * Backward compatibility: some code/tests use `generate` instead of `send`.
@@ -28,6 +30,7 @@ export interface BaseAgent {
     serverName: string
   ): Promise<string>;
   attachLlm?(llmFactory: () => AugmentedLLMProtocol): Promise<void>; // Add optional attachLlm method
+  addTool?(tool: ToolDefinition): void;
 }
 
 export class InteractivePrompt {
@@ -359,6 +362,7 @@ export class Agent implements BaseAgent {
   private _context?: Context;
   private _humanInputCallback?: HumanInputCallback;
   private _config: AgentConfig;
+  private _tools: ToolDefinition[] = [];
 
   constructor(
     config: AgentConfig | string, // Can be AgentConfig or backward compatible string name
@@ -415,6 +419,14 @@ export class Agent implements BaseAgent {
   async attachLlm(llmFactory: () => AugmentedLLMProtocol): Promise<void> {
     // Call the factory to get the LLM instance and store it
     this._llm = llmFactory();
+  }
+
+  addTool(tool: ToolDefinition): void {
+    this._tools.push(tool);
+  }
+
+  get tools(): ToolDefinition[] {
+    return this._tools;
   }
 
   /**
