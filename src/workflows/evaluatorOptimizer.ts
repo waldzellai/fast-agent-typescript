@@ -4,9 +4,10 @@
  * An Evaluator-Optimizer workflow uses an evaluator agent to assess the quality of a response
  * from a worker agent, and an optimizer agent to improve the response if needed.
  */
-import { Agent, BaseAgent, AugmentedLLMProtocol } from '../mcpAgent';
+import { Agent, BaseAgent } from '../mcpAgent';
 import { AgentConfig, AgentType } from '../core/agentTypes';
 import { BaseWorkflow } from './workflow';
+import { messageToString } from '../utils';
 
 export interface EvaluatorOptimizerConfig extends AgentConfig {
   /**
@@ -103,7 +104,7 @@ export class EvaluatorOptimizer extends BaseWorkflow {
     }
     
     // Generate the initial response from the worker
-    let currentResponse = await workerAgent.send(input);
+    let currentResponse = messageToString(await workerAgent.send(input));
     let iterations = 0;
     
     while (iterations < this.maxIterations) {
@@ -123,7 +124,9 @@ SCORE: [number]
 EVALUATION: [your evaluation]
 `;
       
-      const evaluationResult = await evaluatorAgent.send(evaluationPrompt);
+      const evaluationResult = messageToString(
+        await evaluatorAgent.send(evaluationPrompt),
+      );
       
       // Parse the score from the evaluation
       const scoreMatch = evaluationResult.match(/SCORE:\s*(\d+(\.\d+)?)/i);
@@ -151,7 +154,9 @@ Please improve the response based on the evaluation. Focus on addressing the spe
 `;
       
       // Get the optimized response
-      currentResponse = await optimizerAgent.send(optimizationPrompt);
+      currentResponse = messageToString(
+        await optimizerAgent.send(optimizationPrompt),
+      );
       
       // Increment the iteration counter
       iterations++;

@@ -1,5 +1,13 @@
 // mimeUtils.ts
-// Utility functions for handling MIME types in TypeScript
+// Utility functions for handling MIME types and message processing in TypeScript
+
+import {
+  isPromptMessage,
+  isPromptMessageMultipart,
+  isTextContent,
+  PromptMessage,
+  PromptMessageMultipart,
+} from './core/prompt';
 
 /**
  * A mapping of file extensions to MIME types.
@@ -108,4 +116,35 @@ export function isBinaryContent(mimeType: string): boolean {
  */
 export function isImageMimeType(mimeType: string): boolean {
   return mimeType.startsWith("image/") && mimeType !== "image/svg+xml";
+}
+
+/**
+ * Convert various message formats returned by LLMs into a plain string.
+ * Supports raw strings and PromptMessage/PromptMessageMultipart objects.
+ */
+export function messageToString(
+  message: string | PromptMessage | PromptMessageMultipart | any,
+): string {
+  if (typeof message === 'string') {
+    return message;
+  }
+
+  if (isPromptMessage(message) || isPromptMessageMultipart(message)) {
+    const content = (message as any).content;
+    if (Array.isArray(content)) {
+      return content
+        .map((part: any) => (isTextContent(part) ? part.text : ''))
+        .join('\n')
+        .trim();
+    }
+    if (typeof content === 'string') {
+      return content;
+    }
+  }
+
+  try {
+    return JSON.stringify(message);
+  } catch {
+    return String(message);
+  }
 }
