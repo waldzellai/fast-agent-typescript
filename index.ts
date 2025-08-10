@@ -30,7 +30,10 @@ import {
   getArgumentInput,
 } from './src/core/enhancedPrompt';
 import { BaseRequestParams } from './src/core/requestParams';
-import { Agent, BaseAgent } from './src/mcpAgent';
+
+import { Agent, BaseAgent, getLogger, Logger } from './src/mcpAgent';
+import { configureOtel } from './src/telemetry/otel';
+import { trackUsage } from './src/llm/usageTracking';
 import { FastAgent } from './src/fastAgent';
 import {
   Workflow,
@@ -52,6 +55,9 @@ export {
   FastAgent,
   Agent,
   BaseAgent,
+  getLogger,
+  Logger,
+
 
   // Types and Interfaces
   AgentType,
@@ -101,4 +107,6 @@ export {
   OrchestratorConfig,
   EvaluatorOptimizer,
   EvaluatorOptimizerConfig,
+  configureOtel,
+  trackUsage,
 };

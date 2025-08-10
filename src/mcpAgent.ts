@@ -8,18 +8,24 @@
 import { AgentConfig, AgentType } from './core/agentTypes';
 import { PromptMessageMultipart } from './core/prompt';
 import { ToolDefinition } from './tools/toolDefinition';
+import { ConsoleProgressDisplay } from './logging/consoleProgressDisplay';
 
 // Placeholder types and interfaces for missing imports
 export interface BaseAgent {
   name: string;
   agentType: AgentType;
   tools?: ToolDefinition[];
-  send(message: string | PromptMessageMultipart | PromptMessageMultipart[]): Promise<string>;
+  send(
+    message: string | PromptMessageMultipart | PromptMessageMultipart[]
+  ): Promise<string>;
+
   /**
    * Backward compatibility: some code/tests use `generate` instead of `send`.
    * We keep it optional so newer codebases can rely solely on `send`.
    */
-  generate?(message: string | PromptMessageMultipart | PromptMessageMultipart[]): Promise<string>;
+  generate?(
+    message: string | PromptMessageMultipart | PromptMessageMultipart[]
+  ): Promise<string>;
   applyPrompt(promptName: string, args: any): Promise<string>;
   listPrompts(): Promise<string[]>;
   prompt(defaultPrompt?: string, agentName?: string): Promise<string>;
@@ -325,18 +331,8 @@ export class InteractivePrompt {
 
 export type HumanInputCallback = (input: string) => Promise<string>;
 
-export function getLogger(_name: string): any {
-  // Placeholder for logger
-  return console;
-}
-
-export interface AugmentedLLMProtocol {
-  send(message: string, options?: any): Promise<string>;
-  applyPrompt(promptName: string, args: any): Promise<string>;
-  listPrompts(): Promise<string[]>;
-  listResources(): Promise<string[]>;
-  messageHistory: any[];
-}
+// Re-export the structured logger for external modules
+export { createLogger as getLogger, Logger };
 
 export interface Context {
   config?: {
@@ -400,6 +396,16 @@ export class Agent implements BaseAgent {
 
     this._humanInputCallback = humanInputCallback;
     this._context = context;
+
+    if (this._context && !this._context.progress_reporter) {
+      const display = new ConsoleProgressDisplay();
+      this._context.progress_reporter = async (
+        progress: number,
+        total?: number,
+      ): Promise<void> => {
+        display.report(progress, total);
+      };
+    }
   }
 
   /**
@@ -471,7 +477,7 @@ export class Agent implements BaseAgent {
    * Alias method to support legacy `generate` calls
    */
   async generate(
-    message: string | PromptMessageMultipart | PromptMessageMultipart[],
+    message: string | PromptMessageMultipart | PromptMessageMultipart[]
   ): Promise<string> {
     // Simply forward to send()
     return await this.send(message as any);

@@ -9,3 +9,6 @@ export * from './executor/workflow';
 export * from './executor/taskRegistry';
 export * from './context';
 export * from './humanInput/handler';
+export * from './humanInput/forms';
+export * from './humanInput/types';
+export * from './humanInput/elicitation_form';
