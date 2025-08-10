@@ -1,6 +1,7 @@
 import consola from 'consola';
 import { Settings, loadSettings } from './config';
-import { HumanInputCallback, ServerSession } from './app';
+import { ServerSession } from './app';
+import { HumanInputCallback } from './humanInput/types';
 import { Executor, createExecutor } from './executor/executor';
 import { TaskRegistry, createTaskRegistry } from './executor/taskRegistry';
 import { getLogger as createLogger, Logger } from './logging/logger';
