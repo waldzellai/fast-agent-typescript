@@ -1,6 +1,7 @@
 // src/server.ts
 
 import { BaseAgent } from './mcpAgent';
+
 import { FastMCP, type Context } from 'fastmcp';
 import { z } from 'zod';
 import { Prompt } from './core/prompt';
@@ -120,9 +121,21 @@ export class AgentMCPServer {
     func: Function,
     ...args: any[]
   ): Promise<any> {
-    let originalProgressReporter: Function | null = null;
+    let originalProgressReporter:
+      | ((progress: number, total?: number) => Promise<void>)
+      | null = null;
+
     if (agentContext.progress_reporter) {
       originalProgressReporter = agentContext.progress_reporter;
+    } else {
+      const display = new ConsoleProgressDisplay();
+      originalProgressReporter = async (
+        progress: number,
+        total?: number,
+      ): Promise<void> => {
+        display.report(progress, total);
+      };
+      agentContext.progress_reporter = originalProgressReporter;
     }
 
     agentContext.mcp_context = mcpContext;
@@ -136,16 +149,12 @@ export class AgentMCPServer {
       }
     };
 
-    if (agentContext.progress_reporter) {
-      agentContext.progress_reporter = bridgedProgress;
-    }
+    agentContext.progress_reporter = bridgedProgress;
 
     try {
       return await func(...args);
     } finally {
-      if (agentContext.progress_reporter) {
-        agentContext.progress_reporter = originalProgressReporter;
-      }
+      agentContext.progress_reporter = originalProgressReporter;
       if (agentContext.mcp_context) {
         delete agentContext.mcp_context;
       }

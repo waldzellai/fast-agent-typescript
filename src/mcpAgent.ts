@@ -7,11 +7,7 @@
 
 import { AgentConfig, AgentType } from './core/agentTypes';
 import { PromptMessageMultipart } from './core/prompt';
-import {
-  getLogger as createLogger,
-  Logger,
-} from './mcp_agent_ts/logging/logger';
-
+import { ConsoleProgressDisplay } from './logging/consoleProgressDisplay';
 
 // Placeholder types and interfaces for missing imports
 export interface BaseAgent {
@@ -395,6 +391,16 @@ export class Agent implements BaseAgent {
 
     this._humanInputCallback = humanInputCallback;
     this._context = context;
+
+    if (this._context && !this._context.progress_reporter) {
+      const display = new ConsoleProgressDisplay();
+      this._context.progress_reporter = async (
+        progress: number,
+        total?: number,
+      ): Promise<void> => {
+        display.report(progress, total);
+      };
+    }
   }
 
   /**
