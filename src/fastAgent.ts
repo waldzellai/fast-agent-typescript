@@ -4,6 +4,7 @@
  * This class provides a simple interface for creating and running agents.
  */
 
+import { Effect } from 'effect';
 import { Agent, BaseAgent, Context } from './mcpAgent';
 import { AgentConfig, AgentType } from './core/agentTypes';
 import {
@@ -11,9 +12,10 @@ import {
   validateWorkflowReferences,
 } from './core/validation';
 import { getModelFactory } from './core/directFactory';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as yaml from 'js-yaml';
+import {
+  formatConfigError,
+  loadAgentConfiguration,
+} from './core/config/configLoader';
 
 // Import workflow types
 import {
@@ -101,69 +103,26 @@ export class FastAgent {
    * Load configuration from fastagent.config.yaml and fastagent.secrets.yaml
    */
   private loadConfig(): void {
-    try {
-      // Try to load fastagent.config.yaml
-      const configPath = path.resolve(process.cwd(), 'fastagent.config.yaml');
-      if (fs.existsSync(configPath)) {
-        const configContent = fs.readFileSync(configPath, 'utf8');
-        const config = yaml.load(configContent) as any;
-        this.context.config = config;
-        console.log(`Loaded configuration from ${configPath}`);
-      }
+    const result = Effect.runSync(
+      loadAgentConfiguration({
+        cwd: process.cwd(),
+        baseContext: this.context,
+      }).pipe(
+        Effect.catchAll((error) =>
+          Effect.sync(() => {
+            const message = formatConfigError(error);
+            console.warn('Warning: Failed to load configuration files.', message);
+            return {
+              context: this.context,
+              messages: [],
+            };
+          })
+        )
+      )
+    );
 
-      // Try to load fastagent.secrets.yaml
-      const secretsPath = path.resolve(process.cwd(), 'fastagent.secrets.yaml');
-      if (fs.existsSync(secretsPath)) {
-        const secretsContent = fs.readFileSync(secretsPath, 'utf8');
-        const secrets = yaml.load(secretsContent) as any;
-
-        // Set API keys as environment variables
-        if (secrets.openai?.api_key) {
-          process.env.OPENAI_API_KEY = secrets.openai.api_key;
-        }
-        if (secrets.anthropic?.api_key) {
-          process.env.ANTHROPIC_API_KEY = secrets.anthropic.api_key;
-        }
-        if (secrets.deepseek?.api_key) {
-          process.env.DEEPSEEK_API_KEY = secrets.deepseek.api_key;
-        }
-        if (secrets.openrouter?.api_key) {
-          process.env.OPENROUTER_API_KEY = secrets.openrouter.api_key;
-        }
-
-        // Merge MCP server environment variables
-        if (secrets.mcp?.servers) {
-          // Ensure nested structure exists
-          if (!this.context.config) {
-            this.context.config = {};
-          }
-          if (!this.context.config.mcp) {
-            this.context.config.mcp = { servers: {} };
-          } else if (!this.context.config.mcp.servers) {
-            this.context.config.mcp.servers = {};
-          }
-
-          // Only proceed if servers object is confirmed to exist
-          if (this.context.config.mcp.servers) {
-            const servers = this.context.config.mcp.servers; // Now TS knows 'servers' is defined
-
-            for (const [serverName, serverConfig] of Object.entries(
-              secrets.mcp.servers
-            )) {
-              // Use the guaranteed non-undefined local variable 'servers'
-              if (!servers[serverName]) {
-                servers[serverName] = {};
-              }
-              servers[serverName].env = (serverConfig as any).env;
-            }
-          }
-        }
-
-        console.log(`Loaded secrets from ${secretsPath}`);
-      }
-    } catch (error) {
-      console.error('Error loading configuration:', error);
-    }
+    this.context = result.context;
+    result.messages.forEach((message) => console.log(message));
   }
 
   /**
