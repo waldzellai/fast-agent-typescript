@@ -44,6 +44,7 @@
     "agent-orchestrator-ts": "file:./agent-orchestrator-ts",
     "axios": "^1.8.4",
     "commander": "^13.1.0",
+    "effect": "^3.17.13",
     "fastagent": "^1.0.7",
     "fastify": "^5.3.0",
     "fastmcp": "^1.23.2",
